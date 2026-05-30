@@ -41,6 +41,11 @@ import {
 const NO_ROLE = "__none__";
 const ALWAYS = new Set<TabKey>(ALWAYS_ALLOWED_TABS);
 
+// Display label for a role name (the admin role is stored as "admin" in code).
+function roleLabel(name: string): string {
+  return name === "admin" ? "אדמין" : name;
+}
+
 type OverrideState = "default" | "allow" | "deny";
 // userId -> tabKey -> "allow" | "deny" (absence = default)
 type OverrideMap = Record<string, Record<string, "allow" | "deny">>;
@@ -210,17 +215,16 @@ export function UsersManager({
                   <Select
                     value={form.role_id}
                     onValueChange={(v) =>
-                      setForm((f) => ({ ...f, role_id: v ?? NO_ROLE }))
+                      setForm((f) => ({ ...f, role_id: v }))
                     }
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="בחר תפקיד" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value={NO_ROLE}>ללא תפקיד</SelectItem>
                       {roles.map((r) => (
                         <SelectItem key={r.id} value={r.id}>
-                          {r.name}
+                          {roleLabel(r.name)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -269,13 +273,12 @@ export function UsersManager({
                       onValueChange={(v) => handleRoleChange(u.id, v)}
                     >
                       <SelectTrigger className="w-36">
-                        <SelectValue placeholder="ללא תפקיד" />
+                        <SelectValue placeholder="בחר תפקיד" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value={NO_ROLE}>ללא תפקיד</SelectItem>
                         {roles.map((r) => (
                           <SelectItem key={r.id} value={r.id}>
-                            {r.name}
+                            {roleLabel(r.name)}
                           </SelectItem>
                         ))}
                       </SelectContent>
