@@ -1,11 +1,10 @@
 -- Seed reference data for Habokea.
 
--- Roles
-insert into public.roles (name) values ('admin'), ('manager'), ('viewer')
+-- Roles: admin (full access, handled in code) + משתמש (standard user).
+insert into public.roles (name) values ('admin'), ('משתמש')
 on conflict (name) do nothing;
 
--- Default tab access for non-admin roles (admin is handled in code = all tabs).
--- manager: everything except admin tab.
+-- Default tab access for the standard user role: everything except the admin tab.
 insert into public.role_tab_access (role_id, tab_key, can_access)
 select r.id, t.tab_key, t.can_access
 from public.roles r
@@ -16,21 +15,7 @@ cross join (values
   ('admin', false),
   ('profile', true)
 ) as t(tab_key, can_access)
-where r.name = 'manager'
-on conflict (role_id, tab_key) do nothing;
-
--- viewer: vehicles + profile only.
-insert into public.role_tab_access (role_id, tab_key, can_access)
-select r.id, t.tab_key, t.can_access
-from public.roles r
-cross join (values
-  ('vehicles', true),
-  ('drive_card', false),
-  ('whatsapp', false),
-  ('admin', false),
-  ('profile', true)
-) as t(tab_key, can_access)
-where r.name = 'viewer'
+where r.name = 'משתמש'
 on conflict (role_id, tab_key) do nothing;
 
 -- Data helpers: vehicle models & usages (value + Hebrew).
