@@ -6,7 +6,45 @@ import { Select as SelectPrimitive } from "@base-ui/react/select"
 import { cn } from "@/lib/utils"
 import { ChevronDownIcon, CheckIcon, ChevronUpIcon } from "lucide-react"
 
-const Select = SelectPrimitive.Root
+// Collect a { value: label } map from the descendant <SelectItem> elements so
+// that <Select.Value> renders the human-readable label instead of the raw value.
+// base-ui's Select.Value shows the raw value unless the Root receives `items`.
+function collectItems(
+  node: React.ReactNode,
+  acc: Record<string, React.ReactNode>,
+) {
+  React.Children.forEach(node, (child) => {
+    if (!React.isValidElement(child)) return
+    const props = child.props as {
+      value?: unknown
+      children?: React.ReactNode
+    }
+    if (child.type === SelectItem && props.value != null) {
+      acc[String(props.value)] = props.children
+    } else if (props.children) {
+      collectItems(props.children, acc)
+    }
+  })
+}
+
+function Select({
+  items,
+  children,
+  ...props
+}: React.ComponentProps<typeof SelectPrimitive.Root>) {
+  const derivedItems = React.useMemo(() => {
+    if (items) return items
+    const acc: Record<string, React.ReactNode> = {}
+    collectItems(children, acc)
+    return acc
+  }, [items, children])
+
+  return (
+    <SelectPrimitive.Root items={derivedItems} {...props}>
+      {children}
+    </SelectPrimitive.Root>
+  )
+}
 
 function SelectGroup({ className, ...props }: SelectPrimitive.Group.Props) {
   return (
