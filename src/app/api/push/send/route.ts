@@ -1,14 +1,10 @@
-import webpush, { type PushSubscription as WebPushSubscription } from "web-push";
-import { createAdminClient } from "@/lib/supabase/server";
+import { NextResponse } from "next/server";
+import webpush from "web-push";
 import { getCurrentProfile } from "@/lib/permissions";
+import { createAdminClient } from "@/lib/supabase/server";
+import type { PushSubscriptionRow, ProfileRow } from "@/types/database";
 
 export const runtime = "nodejs";
-
-webpush.setVapidDetails(
-  process.env.VAPID_SUBJECT!,
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-  process.env.VAPID_PRIVATE_KEY!
-);
 
 type Audience =
   | { type: "all" }
@@ -16,124 +12,92 @@ type Audience =
   | { type: "user"; value: string };
 
 interface SendBody {
-  title?: string;
-  body?: string;
-  url?: string;
-  audience?: Audience;
+  title: string;
+  body: string;
+  audience: Audience;
 }
 
-interface SubscriptionRow {
-  endpoint: string;
-  p256dh: string;
-  auth: string;
+// Configure VAPID lazily (inside the handler) so importing this module at build
+// time never depends on env vars being present.
+function configureVapid(): boolean {
+  const pub = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "";
+  const priv = process.env.VAPID_PRIVATE_KEY ?? "";
+  const subject = process.env.VAPID_SUBJECT ?? "mailto:admin@example.com";
+  if (!pub || !priv) return false;
+  webpush.setVapidDetails(subject, pub, priv);
+  return true;
 }
 
 export async function POST(req: Request) {
-  const profile = await getCurrentProfile();
-  if (!profile || !profile.is_admin) {
-    return Response.json({ error: "Forbidden" }, { status: 403 });
+  let payload: SendBody;
+  try {
+    payload = (await req.json()) as SendBody;
+  } catch {
+    return NextResponse.json({ error: "גוף הבקשה אינו תקין" }, { status: 400 });
   }
 
-  const payload = (await req.json()) as SendBody;
-  const title = payload.title?.trim();
-  const body = payload.body?.trim() ?? "";
-  const audience: Audience = payload.audience ?? { type: "all" };
+  const me = await getCurrentProfile();
+  if (!me?.is_admin) {
+    return NextResponse.json({ error: "אין הרשאה" }, { status: 403 });
+  }
 
-  if (!title) {
-    return Response.json({ error: "Missing title" }, { status: 400 });
+  if (!configureVapid()) {
+    return NextResponse.json(
+      { error: "מפתחות VAPID לא הוגדרו" },
+      { status: 500 },
+    );
+  }
+
+  const { title, body, audience } = payload;
+  if (!title?.trim() || !body?.trim()) {
+    return NextResponse.json({ error: "כותרת ותוכן חובה" }, { status: 400 });
   }
 
   const admin = createAdminClient();
 
-  let query = admin
-    .from("push_subscriptions")
-    .select("endpoint, p256dh, auth");
-
-  if (audience.type === "user") {
-    if (!audience.value) {
-      return Response.json({ error: "Missing user id" }, { status: 400 });
-    }
-    query = query.eq("user_id", audience.value);
-  } else if (audience.type === "role") {
-    if (!audience.value) {
-      return Response.json({ error: "Missing role" }, { status: 400 });
-    }
-
-    // Resolve role name -> role id (value may be a role name or a role id)
-    const { data: role } = await admin
-      .from("roles")
-      .select("id")
-      .or(`name.eq.${audience.value},id.eq.${audience.value}`)
-      .maybeSingle();
-
-    const roleId = role?.id ?? audience.value;
-
-    const { data: targetProfiles, error: profilesError } = await admin
+  let userIds: string[] | null = null;
+  if (audience.type === "role") {
+    const { data } = await admin
       .from("profiles")
       .select("id")
-      .eq("role_id", roleId);
-
-    if (profilesError) {
-      console.error("Failed to resolve role profiles", profilesError);
-      return Response.json({ error: "Failed to resolve audience" }, { status: 500 });
-    }
-
-    const userIds = (targetProfiles ?? []).map((p) => p.id);
-    if (userIds.length === 0) {
-      return Response.json({ sent: 0, failed: 0 });
-    }
-    query = query.in("user_id", userIds);
+      .eq("role_id", audience.value);
+    userIds = ((data as Pick<ProfileRow, "id">[] | null) ?? []).map(
+      (r) => r.id,
+    );
+  } else if (audience.type === "user") {
+    userIds = [audience.value];
   }
 
-  const { data: subscriptions, error } = await query;
-
-  if (error) {
-    console.error("Failed to fetch subscriptions", error);
-    return Response.json({ error: "Failed to fetch subscriptions" }, { status: 500 });
+  let query = admin.from("push_subscriptions").select("*");
+  if (userIds !== null) {
+    query = query.in("user_id", userIds.length ? userIds : ["__none__"]);
   }
-
-  const rows = (subscriptions ?? []) as SubscriptionRow[];
-  const notification = JSON.stringify({
-    title,
-    body,
-    url: payload.url ?? "/vehicles",
-    icon: "/icons/icon-192.png",
-    badge: "/icons/icon-192.png",
-    dir: "rtl",
-    lang: "he",
-  });
+  const { data: subs } = await query;
+  const subscriptions = (subs as PushSubscriptionRow[] | null) ?? [];
 
   let sent = 0;
   let failed = 0;
-  const deadEndpoints: string[] = [];
-
   await Promise.all(
-    rows.map(async (row) => {
-      const subscription: WebPushSubscription = {
-        endpoint: row.endpoint,
-        keys: { p256dh: row.p256dh, auth: row.auth },
-      };
+    subscriptions.map(async (s) => {
       try {
-        await webpush.sendNotification(subscription, notification);
+        await webpush.sendNotification(
+          {
+            endpoint: s.endpoint,
+            keys: { p256dh: s.p256dh, auth: s.auth },
+          },
+          JSON.stringify({ title, body }),
+        );
         sent++;
-      } catch (err: unknown) {
+      } catch {
         failed++;
-        const statusCode =
-          typeof err === "object" && err !== null && "statusCode" in err
-            ? (err as { statusCode?: number }).statusCode
-            : undefined;
-        if (statusCode === 404 || statusCode === 410) {
-          deadEndpoints.push(row.endpoint);
-        } else {
-          console.error("Push send failed", err);
-        }
+        // Prune dead subscriptions (404/410).
+        await admin
+          .from("push_subscriptions")
+          .delete()
+          .eq("endpoint", s.endpoint);
       }
-    })
+    }),
   );
 
-  if (deadEndpoints.length > 0) {
-    await admin.from("push_subscriptions").delete().in("endpoint", deadEndpoints);
-  }
-
-  return Response.json({ sent, failed });
+  return NextResponse.json({ sent, failed });
 }
