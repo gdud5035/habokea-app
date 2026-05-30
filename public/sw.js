@@ -1,24 +1,42 @@
-/* Service Worker for גדוד הבוקע 5035 PWA — Web Push */
+/* Service Worker for גדוד הבוקע 5035 PWA — Web Push only.
+ * Intentionally has NO fetch handler: it must never cache app assets or HTML,
+ * otherwise stale JS bundles would call server-action IDs that no longer exist
+ * after a deploy ("Server Action ... was not found"). */
+
+self.addEventListener("install", () => {
+  // Activate this SW immediately, replacing any older registered version.
+  self.skipWaiting();
+});
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    (async () => {
+      // Purge any caches left behind by earlier SW versions that DID cache.
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => caches.delete(k)));
+      await self.clients.claim();
+    })(),
+  );
+});
 
 self.addEventListener("push", (event) => {
-  let data = {};
-  try {
-    data = event.data ? event.data.json() : {};
-  } catch {
-    data = { body: event.data && event.data.text() };
-  }
+  const data = (() => {
+    try {
+      return event.data ? event.data.json() : {};
+    } catch {
+      return { title: "גדוד הבוקע 5035", body: event.data?.text() ?? "" };
+    }
+  })();
 
   const title = data.title || "גדוד הבוקע 5035";
+  const body = data.body || "";
   const options = {
-    body: data.body || "",
+    body,
     icon: data.icon || "/icons/icon-192.png",
     badge: data.badge || "/icons/icon-192.png",
-    dir: data.dir || "rtl",
-    lang: data.lang || "he",
-    data: { url: data.url || "/vehicles" },
-    tag: data.tag,
-    renotify: Boolean(data.tag),
-    requireInteraction: false,
+    dir: "rtl",
+    lang: "he",
+    data: { url: data.url || "/" },
   };
 
   event.waitUntil(self.registration.showNotification(title, options));
@@ -26,20 +44,19 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = (event.notification.data && event.notification.data.url) || "/vehicles";
-
+  const targetUrl = event.notification.data?.url || "/";
   event.waitUntil(
-    self.clients
-      .matchAll({ type: "window", includeUncontrolled: true })
-      .then((clients) => {
-        for (const c of clients) {
-          if (c.url.includes(url) && "focus" in c) return c.focus();
+    (async () => {
+      const allClients = await self.clients.matchAll({
+        type: "window",
+        includeUncontrolled: true,
+      });
+      for (const client of allClients) {
+        if (client.url.includes(targetUrl) && "focus" in client) {
+          return client.focus();
         }
-        if (self.clients.openWindow) return self.clients.openWindow(url);
-      })
+      }
+      if (self.clients.openWindow) return self.clients.openWindow(targetUrl);
+    })(),
   );
 });
-
-// Activate immediately on update
-self.addEventListener("install", () => self.skipWaiting());
-self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
