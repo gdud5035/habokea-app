@@ -4,11 +4,12 @@
 export const APP_NAME = "גדוד הבוקע - 5035";
 
 // ---- Tabs / permissions ----
-export const TAB_KEYS = ["vehicles", "drive_card", "whatsapp", "admin", "profile"] as const;
+export const TAB_KEYS = ["vehicles", "drones", "drive_card", "whatsapp", "admin", "profile"] as const;
 export type TabKey = (typeof TAB_KEYS)[number];
 
 export const TAB_LABELS: Record<TabKey, string> = {
   vehicles: "רכבים",
+  drones: "רחפנים",
   drive_card: "כרטיס עבודה",
   whatsapp: "הודעות וואטסאפ",
   admin: "ניהול",
@@ -17,6 +18,7 @@ export const TAB_LABELS: Record<TabKey, string> = {
 
 export const TAB_ROUTES: Record<TabKey, string> = {
   vehicles: "/vehicles",
+  drones: "/drones",
   drive_card: "/drive-card",
   whatsapp: "/whatsapp",
   admin: "/admin",

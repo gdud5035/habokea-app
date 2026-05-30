@@ -100,6 +100,19 @@ export type PushSubscriptionRow = {
   created_at: string;
 };
 
+export type DroneRow = {
+  id: string;
+  name: string;
+  at_company: string | null;
+  signed_by: string | null;
+  created_at: string;
+};
+export type DroneInsert = Omit<DroneRow, "id" | "created_at"> & {
+  id?: string;
+  created_at?: string;
+};
+export type DroneUpdate = Partial<DroneInsert>;
+
 type Table<R, I = Partial<R>, U = Partial<R>> = {
   Row: R;
   Insert: I;
@@ -118,6 +131,7 @@ export type Database = {
       data_helpers: Table<DataHelperRow>;
       drive_cards: Table<DriveCardRow, DriveCardInsert>;
       push_subscriptions: Table<PushSubscriptionRow>;
+      drones: Table<DroneRow, DroneInsert, DroneUpdate>;
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
