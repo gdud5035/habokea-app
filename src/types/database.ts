@@ -111,8 +111,8 @@ export type Database = {
   public: {
     Tables: {
       vehicles: Table<VehicleRow, VehicleInsert, VehicleUpdate>;
-      profiles: Table<ProfileRow, Partial<ProfileRow> & { id: string }>;
-      roles: Table<RoleRow, Partial<RoleRow> & { name: string }>;
+      profiles: Table<ProfileRow>;
+      roles: Table<RoleRow>;
       role_tab_access: Table<RoleTabAccessRow>;
       user_tab_overrides: Table<UserTabOverrideRow>;
       data_helpers: Table<DataHelperRow>;

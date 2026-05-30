@@ -1,5 +1,8 @@
 import { createServerClient } from "@supabase/ssr";
-import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import {
+  createClient as createSupabaseClient,
+  type SupabaseClient,
+} from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import type { Database } from "@/types/database";
 
@@ -32,7 +35,7 @@ export async function createClient() {
 
 // Service-role client for privileged server actions (create users, phone->email
 // lookup, sending push). NEVER import this into a client component.
-export function createAdminClient() {
+export function createAdminClient(): SupabaseClient<Database> {
   return createSupabaseClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,

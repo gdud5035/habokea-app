@@ -4,6 +4,7 @@ import "./globals.css";
 import { Providers } from "@/lib/providers";
 import { Toaster } from "@/components/ui/sonner";
 import { APP_NAME } from "@/lib/constants";
+import { PwaRegister } from "@/components/pwa-register";
 
 const heebo = Heebo({
   variable: "--font-sans",
@@ -49,6 +50,7 @@ export default function RootLayout({
     >
       <body className="min-h-full bg-background text-foreground">
         <Providers>{children}</Providers>
+        <PwaRegister />
         <Toaster richColors position="top-center" />
       </body>
     </html>
