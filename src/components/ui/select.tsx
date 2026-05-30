@@ -30,8 +30,14 @@ function collectItems(
 function Select({
   items,
   children,
+  onValueChange,
   ...props
-}: React.ComponentProps<typeof SelectPrimitive.Root>) {
+}: Omit<
+  React.ComponentProps<typeof SelectPrimitive.Root>,
+  "onValueChange"
+> & {
+  onValueChange?: (value: string) => void
+}) {
   const derivedItems = React.useMemo(() => {
     if (items) return items
     const acc: Record<string, React.ReactNode> = {}
@@ -40,7 +46,16 @@ function Select({
   }, [items, children])
 
   return (
-    <SelectPrimitive.Root items={derivedItems} {...props}>
+    <SelectPrimitive.Root
+      items={derivedItems}
+      onValueChange={
+        onValueChange
+          ? (value: unknown) =>
+              onValueChange(value == null ? "" : String(value))
+          : undefined
+      }
+      {...props}
+    >
       {children}
     </SelectPrimitive.Root>
   )
