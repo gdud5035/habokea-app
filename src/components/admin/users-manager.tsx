@@ -79,13 +79,22 @@ export function UsersManager({
 
   const selectedUser = users.find((u) => u.id === selectedUserId) ?? null;
 
+  // Default new users to the standard "משתמש" role (fall back to first non-admin
+  // role, then to no role) instead of starting with no role selected.
+  const defaultRoleId = useMemo(() => {
+    const standard = roles.find((r) => r.name === "משתמש");
+    if (standard) return standard.id;
+    const nonAdmin = roles.find((r) => r.name !== "admin");
+    return nonAdmin?.id ?? NO_ROLE;
+  }, [roles]);
+
   // --- create user dialog ---
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
     full_name: "",
     email: "",
     phone: "",
-    role_id: NO_ROLE,
+    role_id: defaultRoleId,
   });
 
   function handleCreate() {
@@ -110,7 +119,7 @@ export function UsersManager({
           },
         ]);
         toast.success("המשתמש נוצר. הסיסמה הראשונית היא מספר הטלפון.");
-        setForm({ full_name: "", email: "", phone: "", role_id: NO_ROLE });
+        setForm({ full_name: "", email: "", phone: "", role_id: defaultRoleId });
         setOpen(false);
       } else if (!res.ok) {
         toast.error(res.error);
