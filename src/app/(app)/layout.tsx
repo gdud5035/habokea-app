@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import { headers } from "next/headers";
 import { AppShell } from "@/components/app-shell";
 import { getCurrentProfile, getEffectivePermissions } from "@/lib/permissions";
 import type { TabKey } from "@/lib/constants";
@@ -13,13 +12,6 @@ export default async function AppLayout({
 }) {
   const profile = await getCurrentProfile();
   if (!profile) redirect("/login");
-
-  // Force first-login password change — but never redirect /profile to itself,
-  // or the profile page (which hosts the change-password form) would loop forever.
-  const pathname = (await headers()).get("x-pathname") ?? "";
-  if (profile.must_change_password && !pathname.startsWith("/profile")) {
-    redirect("/profile?changePassword=1");
-  }
 
   const allowed = await getEffectivePermissions(profile.id);
   const allowedTabs = Array.from(allowed) as TabKey[];

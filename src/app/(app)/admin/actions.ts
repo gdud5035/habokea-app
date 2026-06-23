@@ -66,7 +66,7 @@ export async function createUserAction(input: {
       email,
       phone,
       role_id: input.role_id,
-      must_change_password: true,
+      must_change_password: false,
     });
 
     if (profileErr) {

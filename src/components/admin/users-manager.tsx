@@ -119,7 +119,7 @@ export function UsersManager({
             email: form.email.trim().toLowerCase(),
             phone: form.phone.trim(),
             role_id: form.role_id === NO_ROLE ? null : form.role_id,
-            must_change_password: true,
+            must_change_password: false,
             created_at: "",
           },
         ]);
