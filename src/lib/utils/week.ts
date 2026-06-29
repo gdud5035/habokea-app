@@ -28,17 +28,24 @@ function pad(n: number): string {
   return n.toString().padStart(2, "0");
 }
 
-// Tile a 24h day from 00:00 into slots of `shiftLengthHours`.
-// The last slot may be shorter if the length doesn't divide 24.
-export function computeSlots(shiftLengthHours: number): Slot[] {
+// Sentinel slot_start_hour value for the "בבית" (home) row.
+export const HOME_SLOT = -1;
+
+// Tile a 24h day into slots of `shiftLengthHours`, starting at `startHour`.
+// Slots wrap past midnight; a slot's `startHour` is the clock hour (0-23).
+export function computeSlots(shiftLengthHours: number, startHour = 0): Slot[] {
   const len = Math.max(1, Math.min(24, Math.floor(shiftLengthHours) || 8));
+  const start0 = (((Math.floor(startHour) || 0) % 24) + 24) % 24;
+  const count = Math.ceil(24 / len);
   const slots: Slot[] = [];
-  for (let start = 0; start < 24; start += len) {
-    const end = Math.min(start + len, 24);
+  for (let i = 0; i < count; i++) {
+    const start = (start0 + i * len) % 24;
+    const endRaw = start + len;
+    const endClock = endRaw % 24 === 0 ? 24 : endRaw % 24;
     slots.push({
       startHour: start,
-      endHour: end,
-      label: `${pad(start)}:00–${pad(end === 24 ? 24 : end)}:00`,
+      endHour: endClock,
+      label: `${pad(start)}:00–${pad(endClock)}:00`,
     });
   }
   return slots;
@@ -47,4 +54,17 @@ export function computeSlots(shiftLengthHours: number): Slot[] {
 // YYYY-MM-DD key for a date (used as the DB `shift_date` value).
 export function dateKey(date: Date): string {
   return formatDateForInput(date);
+}
+
+// Pick a readable text color (black/white) for a given hex background.
+export function textOn(bgHex?: string | null): string {
+  if (!bgHex) return "inherit";
+  const hex = bgHex.replace("#", "");
+  if (hex.length !== 6) return "inherit";
+  const r = parseInt(hex.slice(0, 2), 16);
+  const g = parseInt(hex.slice(2, 4), 16);
+  const b = parseInt(hex.slice(4, 6), 16);
+  // Relative luminance (sRGB approximation).
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.6 ? "#1a1a1a" : "#ffffff";
 }

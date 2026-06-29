@@ -2,30 +2,50 @@
 
 import { cn } from "@/lib/utils";
 import { WEEKDAY_HE } from "@/lib/constants";
-import { dateKey, type Slot } from "@/lib/utils/week";
-import type { HamalAssignmentRow } from "@/types/database";
+import { dateKey, textOn, type Slot } from "@/lib/utils/week";
+import type { HamalAssignmentRow, HamalSambatzRow } from "@/types/database";
 
 export interface HamalGridProps {
   days: Date[];
   slots: Slot[];
   /** key = `${dateKey}|${slot.startHour}` → assignments in that cell. */
   assignmentsByCell: Map<string, HamalAssignmentRow[]>;
-  nameById: Map<string, string>;
+  /** key = dateKey → home (בבית) assignments for that day. */
+  homeByDate: Map<string, HamalAssignmentRow[]>;
+  sambatzById: Map<string, HamalSambatzRow>;
   todayKey: string;
   onCellClick: (date: Date, slot: Slot) => void;
+  onHomeClick: (date: Date) => void;
 }
 
 function cellKey(dk: string, startHour: number): string {
   return `${dk}|${startHour}`;
 }
 
+function NameChip({ s }: { s: HamalSambatzRow | undefined }) {
+  const color = s?.color ?? null;
+  return (
+    <span
+      className={cn(
+        "truncate rounded px-1.5 py-0.5 text-xs",
+        !color && "bg-primary/10 text-primary",
+      )}
+      style={color ? { backgroundColor: color, color: textOn(color) } : undefined}
+    >
+      {s?.full_name ?? "—"}
+    </span>
+  );
+}
+
 export function HamalGrid({
   days,
   slots,
   assignmentsByCell,
-  nameById,
+  homeByDate,
+  sambatzById,
   todayKey,
   onCellClick,
+  onHomeClick,
 }: HamalGridProps) {
   return (
     <div className="overflow-x-auto rounded-md border" dir="rtl">
@@ -64,7 +84,8 @@ export function HamalGrid({
               {days.map((d) => {
                 const dk = dateKey(d);
                 const isToday = dk === todayKey;
-                const rows = assignmentsByCell.get(cellKey(dk, slot.startHour)) ?? [];
+                const rows =
+                  assignmentsByCell.get(cellKey(dk, slot.startHour)) ?? [];
                 const full = rows.length >= 2;
                 return (
                   <td
@@ -89,12 +110,10 @@ export function HamalGrid({
                       ) : (
                         <>
                           {rows.map((a) => (
-                            <span
+                            <NameChip
                               key={a.id}
-                              className="truncate rounded bg-primary/10 px-1.5 py-0.5 text-xs text-primary"
-                            >
-                              {nameById.get(a.sambatz_id) ?? "—"}
-                            </span>
+                              s={sambatzById.get(a.sambatz_id)}
+                            />
                           ))}
                           {!full && (
                             <span className="text-xs text-muted-foreground/60">
@@ -109,6 +128,44 @@ export function HamalGrid({
               })}
             </tr>
           ))}
+
+          {/* בבית row */}
+          <tr>
+            <th className="sticky right-0 z-10 border-l bg-muted/30 p-2 text-center text-xs font-medium whitespace-nowrap text-muted-foreground">
+              בבית
+            </th>
+            {days.map((d) => {
+              const dk = dateKey(d);
+              const isToday = dk === todayKey;
+              const rows = homeByDate.get(dk) ?? [];
+              return (
+                <td
+                  key={dk}
+                  className={cn(
+                    "border-l p-1 align-top last:border-l-0",
+                    isToday && "bg-primary/5",
+                  )}
+                >
+                  <button
+                    type="button"
+                    onClick={() => onHomeClick(d)}
+                    className={cn(
+                      "flex h-full min-h-12 w-full flex-wrap gap-1 rounded-md p-1.5 text-right transition-colors hover:bg-accent",
+                      rows.length === 0 && "text-muted-foreground/60",
+                    )}
+                  >
+                    {rows.length === 0 ? (
+                      <span className="text-xs">+ בבית</span>
+                    ) : (
+                      rows.map((a) => (
+                        <NameChip key={a.id} s={sambatzById.get(a.sambatz_id)} />
+                      ))
+                    )}
+                  </button>
+                </td>
+              );
+            })}
+          </tr>
         </tbody>
       </table>
     </div>

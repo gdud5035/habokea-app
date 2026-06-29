@@ -30,6 +30,22 @@ export const TAB_ROUTES: Record<TabKey, string> = {
 // Profile is always accessible to any authenticated user.
 export const ALWAYS_ALLOWED_TABS: TabKey[] = ["profile"];
 
+// ---- Color palette for סמבצים (שבצק חמל) ----
+export const HAMAL_COLORS: string[] = [
+  "#ef4444", // red
+  "#f97316", // orange
+  "#f59e0b", // amber
+  "#eab308", // yellow
+  "#84cc16", // lime
+  "#22c55e", // green
+  "#14b8a6", // teal
+  "#06b6d4", // cyan
+  "#3b82f6", // blue
+  "#6366f1", // indigo
+  "#a855f7", // purple
+  "#ec4899", // pink
+];
+
 // ---- Hebrew weekday names (JS getDay(): 0 = Sunday … 6 = Saturday) ----
 export const WEEKDAY_HE: Record<number, string> = {
   0: "ראשון",

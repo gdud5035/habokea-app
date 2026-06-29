@@ -9,7 +9,14 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ChevronLeft, ChevronRight, Settings, Users } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  MessageCircle,
+  Settings,
+  Users,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { WEEKDAY_HE } from "@/lib/constants";
 import {
@@ -18,8 +25,13 @@ import {
   dateKey,
   getWeekStart,
   weekDays,
+  HOME_SLOT,
   type Slot,
 } from "@/lib/utils/week";
+import {
+  buildWeekRoster,
+  formatWhatsAppMessage,
+} from "@/lib/hamal-report";
 import type {
   HamalAssignmentRow,
   HamalSambatzRow,
@@ -29,35 +41,55 @@ import { TableSkeleton } from "@/components/loading-skeletons";
 import { HamalGrid } from "@/components/hamal/hamal-grid";
 import { AssignShiftDialog } from "@/components/hamal/assign-shift-dialog";
 import { SambatzimDialog } from "@/components/hamal/sambatzim-dialog";
-import { ShiftSettingsDialog } from "@/components/hamal/shift-settings-dialog";
+import {
+  ShiftSettingsDialog,
+  type ShiftSettings,
+} from "@/components/hamal/shift-settings-dialog";
+import { HomeDialog } from "@/components/hamal/home-dialog";
+import { ShiftCountsTable } from "@/components/hamal/shift-counts-table";
 
-const DEFAULT_SHIFT_HOURS = 8;
+const DEFAULTS: ShiftSettings = { length: 8, start: 0 };
 const SETTINGS_KEY = ["hamal_settings"] as const;
 const SAMBATZIM_KEY = ["hamal_sambatzim"] as const;
-const SHIFT_LENGTH_SETTING = "hamal_shift_length_hours";
+const LENGTH_SETTING = "hamal_shift_length_hours";
+const START_SETTING = "hamal_day_start_hour";
 
 const supabase = () => createClient();
 
-// ---- short dd/MM ----
 function ddmm(d: Date): string {
   return `${d.getDate().toString().padStart(2, "0")}/${(d.getMonth() + 1)
     .toString()
     .padStart(2, "0")}`;
 }
 
+// Israeli local phone → wa.me international format (972…).
+function waNumber(phone: string | null): string {
+  if (!phone) return "";
+  let d = phone.replace(/\D/g, "");
+  if (d.startsWith("972")) d = d.slice(3);
+  d = d.replace(/^0+/, "");
+  return d ? `972${d}` : "";
+}
+
 // ------------------------------------------------------------------
 // Data fetchers
 // ------------------------------------------------------------------
 
-async function fetchShiftLength(): Promise<number> {
+async function fetchSettings(): Promise<ShiftSettings> {
   const { data, error } = await supabase()
     .from("app_settings")
-    .select("value")
-    .eq("key", SHIFT_LENGTH_SETTING)
-    .maybeSingle();
+    .select("key, value")
+    .in("key", [LENGTH_SETTING, START_SETTING]);
   if (error) throw error;
-  const n = Number((data as { value: string } | null)?.value);
-  return Number.isFinite(n) && n >= 1 ? Math.floor(n) : DEFAULT_SHIFT_HOURS;
+  const rows = (data as { key: string; value: string }[] | null) ?? [];
+  const num = (k: string, dflt: number) => {
+    const n = Number(rows.find((r) => r.key === k)?.value);
+    return Number.isFinite(n) ? n : dflt;
+  };
+  return {
+    length: num(LENGTH_SETTING, DEFAULTS.length),
+    start: num(START_SETTING, DEFAULTS.start),
+  };
 }
 
 async function fetchSambatzim(): Promise<HamalSambatzRow[]> {
@@ -86,13 +118,20 @@ async function fetchAssignments(
 // Inner component
 // ------------------------------------------------------------------
 
-function HamalInner({ isAdmin }: { isAdmin: boolean }) {
+function HamalInner({
+  isAdmin,
+  userPhone,
+}: {
+  isAdmin: boolean;
+  userPhone: string | null;
+}) {
   const queryClient = useQueryClient();
 
   const [weekStart, setWeekStart] = useState(() => getWeekStart(new Date()));
   const [assignCtx, setAssignCtx] = useState<{ date: Date; slot: Slot } | null>(
     null,
   );
+  const [homeCtx, setHomeCtx] = useState<Date | null>(null);
   const [sambatzimOpen, setSambatzimOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -107,7 +146,7 @@ function HamalInner({ isAdmin }: { isAdmin: boolean }) {
 
   const settingsQuery = useQuery({
     queryKey: SETTINGS_KEY,
-    queryFn: fetchShiftLength,
+    queryFn: fetchSettings,
   });
   const sambatzimQuery = useQuery({
     queryKey: SAMBATZIM_KEY,
@@ -118,31 +157,66 @@ function HamalInner({ isAdmin }: { isAdmin: boolean }) {
     queryFn: () => fetchAssignments(startKey, endKey),
   });
 
-  const shiftLength = settingsQuery.data ?? DEFAULT_SHIFT_HOURS;
-  const slots = useMemo(() => computeSlots(shiftLength), [shiftLength]);
+  const settings = settingsQuery.data ?? DEFAULTS;
+  const slots = useMemo(
+    () => computeSlots(settings.length, settings.start),
+    [settings.length, settings.start],
+  );
   const sambatzim = useMemo(
     () => sambatzimQuery.data ?? [],
     [sambatzimQuery.data],
   );
 
+  const sambatzById = useMemo(() => {
+    const m = new Map<string, HamalSambatzRow>();
+    sambatzim.forEach((s) => m.set(s.id, s));
+    return m;
+  }, [sambatzim]);
   const nameById = useMemo(() => {
     const m = new Map<string, string>();
     sambatzim.forEach((s) => m.set(s.id, s.full_name));
     return m;
   }, [sambatzim]);
 
+  const allAssignments = useMemo(
+    () => assignmentsQuery.data ?? [],
+    [assignmentsQuery.data],
+  );
+
   const assignmentsByCell = useMemo(() => {
     const m = new Map<string, HamalAssignmentRow[]>();
-    (assignmentsQuery.data ?? []).forEach((a) => {
+    allAssignments.forEach((a) => {
+      if (a.slot_start_hour === HOME_SLOT) return;
       const key = `${a.shift_date}|${a.slot_start_hour}`;
       const arr = m.get(key);
       if (arr) arr.push(a);
       else m.set(key, [a]);
     });
     return m;
-  }, [assignmentsQuery.data]);
+  }, [allAssignments]);
+
+  const homeByDate = useMemo(() => {
+    const m = new Map<string, HamalAssignmentRow[]>();
+    allAssignments.forEach((a) => {
+      if (a.slot_start_hour !== HOME_SLOT) return;
+      const arr = m.get(a.shift_date);
+      if (arr) arr.push(a);
+      else m.set(a.shift_date, [a]);
+    });
+    return m;
+  }, [allAssignments]);
+
+  const countById = useMemo(() => {
+    const m = new Map<string, number>();
+    allAssignments.forEach((a) => {
+      if (a.slot_start_hour === HOME_SLOT) return;
+      m.set(a.sambatz_id, (m.get(a.sambatz_id) ?? 0) + 1);
+    });
+    return m;
+  }, [allAssignments]);
 
   // ---- Mutations ----
+  // Used for both shift slots and the home row (slot_start_hour = -1).
   const saveAssignments = useMutation({
     mutationFn: async ({
       dk,
@@ -173,23 +247,40 @@ function HamalInner({ isAdmin }: { isAdmin: boolean }) {
         if (insErr) throw insErr;
       }
     },
-    onError: () => toast.error("שמירת השיבוץ נכשלה"),
-    onSuccess: () => toast.success("השיבוץ נשמר"),
+    onError: () => toast.error("השמירה נכשלה"),
+    onSuccess: () => toast.success("נשמר"),
     onSettled: () =>
       queryClient.invalidateQueries({ queryKey: ASSIGNMENTS_KEY }),
   });
 
   const addSambatz = useMutation({
-    mutationFn: async (full_name: string) => {
+    mutationFn: async ({
+      full_name,
+      color,
+    }: {
+      full_name: string;
+      color: string;
+    }) => {
       const { error } = await supabase()
         .from("hamal_sambatzim")
-        .insert([{ full_name }]);
+        .insert([{ full_name, color }]);
       if (error) throw error;
     },
     onError: () => toast.error("הוספת הסמבץ נכשלה"),
     onSuccess: () => toast.success("הסמבץ נוסף"),
-    onSettled: () =>
-      queryClient.invalidateQueries({ queryKey: SAMBATZIM_KEY }),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: SAMBATZIM_KEY }),
+  });
+
+  const setSambatzColor = useMutation({
+    mutationFn: async ({ id, color }: { id: string; color: string }) => {
+      const { error } = await supabase()
+        .from("hamal_sambatzim")
+        .update({ color })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onError: () => toast.error("עדכון הצבע נכשל"),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: SAMBATZIM_KEY }),
   });
 
   const deleteSambatz = useMutation({
@@ -208,16 +299,23 @@ function HamalInner({ isAdmin }: { isAdmin: boolean }) {
     },
   });
 
-  const updateShiftLength = useMutation({
-    mutationFn: async (hours: number) => {
+  const updateSettings = useMutation({
+    mutationFn: async (next: ShiftSettings) => {
       const { error } = await supabase()
         .from("app_settings")
         .upsert(
-          {
-            key: SHIFT_LENGTH_SETTING,
-            value: String(hours),
-            updated_at: new Date().toISOString(),
-          },
+          [
+            {
+              key: LENGTH_SETTING,
+              value: String(next.length),
+              updated_at: new Date().toISOString(),
+            },
+            {
+              key: START_SETTING,
+              value: String(next.start),
+              updated_at: new Date().toISOString(),
+            },
+          ],
           { onConflict: "key" },
         );
       if (error) throw error;
@@ -226,6 +324,27 @@ function HamalInner({ isAdmin }: { isAdmin: boolean }) {
     onSuccess: () => toast.success("ההגדרות נשמרו"),
     onSettled: () => queryClient.invalidateQueries({ queryKey: SETTINGS_KEY }),
   });
+
+  // ---- Actions ----
+  const handlePdf = () => {
+    const a = document.createElement("a");
+    a.href = `/api/hamal/pdf?week=${startKey}`;
+    a.download = `hamal_${startKey}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  };
+
+  const handleWhatsApp = () => {
+    const roster = buildWeekRoster(days, slots, allAssignments, nameById);
+    const msg = formatWhatsAppMessage(roster);
+    const intl = waNumber(userPhone);
+    if (!intl) {
+      toast.error("לא מוגדר מספר טלפון בפרופיל — נפתחה בחירת איש קשר");
+    }
+    const base = intl ? `https://wa.me/${intl}` : "https://wa.me/";
+    window.open(`${base}?text=${encodeURIComponent(msg)}`, "_blank");
+  };
 
   // ---- Render ----
   if (
@@ -243,16 +362,27 @@ function HamalInner({ isAdmin }: { isAdmin: boolean }) {
         ) ?? []
       ).map((a) => a.sambatz_id)
     : [];
+  const homeCurrentIds = homeCtx
+    ? (homeByDate.get(dateKey(homeCtx)) ?? []).map((a) => a.sambatz_id)
+    : [];
 
   return (
     <div className="space-y-4 p-4" dir="rtl">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold">שבצק חמל</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" onClick={() => setSambatzimOpen(true)}>
             <Users className="size-4" />
             ניהול סמבצים
+          </Button>
+          <Button variant="outline" onClick={handlePdf}>
+            <Download className="size-4" />
+            הורד PDF
+          </Button>
+          <Button variant="outline" onClick={handleWhatsApp}>
+            <MessageCircle className="size-4" />
+            וואטסאפ
           </Button>
           {isAdmin && (
             <Button
@@ -270,7 +400,6 @@ function HamalInner({ isAdmin }: { isAdmin: boolean }) {
       {/* Week navigation */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-1">
-          {/* RTL: previous week sits on the right (chevron pointing right) */}
           <Button
             variant="outline"
             size="icon"
@@ -303,10 +432,14 @@ function HamalInner({ isAdmin }: { isAdmin: boolean }) {
         days={days}
         slots={slots}
         assignmentsByCell={assignmentsByCell}
-        nameById={nameById}
+        homeByDate={homeByDate}
+        sambatzById={sambatzById}
         todayKey={todayKey}
         onCellClick={(date, slot) => setAssignCtx({ date, slot })}
+        onHomeClick={(date) => setHomeCtx(date)}
       />
+
+      <ShiftCountsTable sambatzim={sambatzim} countById={countById} />
 
       <AssignShiftDialog
         open={assignCtx !== null}
@@ -330,21 +463,42 @@ function HamalInner({ isAdmin }: { isAdmin: boolean }) {
         }}
       />
 
+      <HomeDialog
+        open={homeCtx !== null}
+        contextLabel={
+          homeCtx ? `${WEEKDAY_HE[homeCtx.getDay()]} ${ddmm(homeCtx)}` : ""
+        }
+        sambatzim={sambatzim}
+        currentIds={homeCurrentIds}
+        onClose={() => setHomeCtx(null)}
+        onSave={(ids) => {
+          if (homeCtx) {
+            saveAssignments.mutate({
+              dk: dateKey(homeCtx),
+              startHour: HOME_SLOT,
+              ids,
+            });
+          }
+          setHomeCtx(null);
+        }}
+      />
+
       <SambatzimDialog
         open={sambatzimOpen}
         sambatzim={sambatzim}
         onClose={() => setSambatzimOpen(false)}
-        onAdd={(name) => addSambatz.mutate(name)}
+        onAdd={(full_name, color) => addSambatz.mutate({ full_name, color })}
         onDelete={(id) => deleteSambatz.mutate(id)}
+        onSetColor={(id, color) => setSambatzColor.mutate({ id, color })}
       />
 
       {isAdmin && (
         <ShiftSettingsDialog
           open={settingsOpen}
-          current={shiftLength}
+          current={settings}
           onClose={() => setSettingsOpen(false)}
-          onSave={(hours) => {
-            updateShiftLength.mutate(hours);
+          onSave={(next) => {
+            updateSettings.mutate(next);
             setSettingsOpen(false);
           }}
         />
@@ -353,11 +507,17 @@ function HamalInner({ isAdmin }: { isAdmin: boolean }) {
   );
 }
 
-export function HamalClient({ isAdmin }: { isAdmin: boolean }) {
+export function HamalClient({
+  isAdmin,
+  userPhone,
+}: {
+  isAdmin: boolean;
+  userPhone: string | null;
+}) {
   const [client] = useState(() => new QueryClient());
   return (
     <QueryClientProvider client={client}>
-      <HamalInner isAdmin={isAdmin} />
+      <HamalInner isAdmin={isAdmin} userPhone={userPhone} />
     </QueryClientProvider>
   );
 }

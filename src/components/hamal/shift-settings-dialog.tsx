@@ -13,11 +13,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+export interface ShiftSettings {
+  length: number;
+  start: number;
+}
+
 export interface ShiftSettingsDialogProps {
   open: boolean;
-  current: number;
+  current: ShiftSettings;
   onClose: () => void;
-  onSave: (hours: number) => void;
+  onSave: (settings: ShiftSettings) => void;
 }
 
 export function ShiftSettingsDialog({
@@ -26,16 +31,22 @@ export function ShiftSettingsDialog({
   onClose,
   onSave,
 }: ShiftSettingsDialogProps) {
-  const [value, setValue] = useState(String(current));
+  const [length, setLength] = useState(String(current.length));
+  const [start, setStart] = useState(String(current.start));
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const hours = Math.floor(Number(value));
-    if (!Number.isFinite(hours) || hours < 1 || hours > 24) {
+    const len = Math.floor(Number(length));
+    const st = Math.floor(Number(start));
+    if (!Number.isFinite(len) || len < 1 || len > 24) {
       toast.error("אורך המשמרת חייב להיות בין 1 ל-24 שעות");
       return;
     }
-    onSave(hours);
+    if (!Number.isFinite(st) || st < 0 || st > 23) {
+      toast.error("שעת ההתחלה חייבת להיות בין 0 ל-23");
+      return;
+    }
+    onSave({ length: len, start: st });
   }
 
   return (
@@ -53,12 +64,24 @@ export function ShiftSettingsDialog({
               type="number"
               min={1}
               max={24}
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
+              value={length}
+              onChange={(e) => setLength(e.target.value)}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="day-start">שעת התחלה</Label>
+            <Input
+              id="day-start"
+              type="number"
+              min={0}
+              max={23}
+              value={start}
+              onChange={(e) => setStart(e.target.value)}
             />
             <p className="text-xs text-muted-foreground">
-              שינוי אורך המשמרת מחלק מחדש את לוח השבוע. שיבוצים קיימים שאינם
-              מתיישרים לשעת התחלה חדשה לא יוצגו.
+              חלוקת המשמרות מתחילה משעה זו. שינוי ההגדרות מחלק מחדש את לוח השבוע;
+              שיבוצים שאינם מתיישרים לשעת התחלה חדשה לא יוצגו.
             </p>
           </div>
 

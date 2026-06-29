@@ -5,5 +5,10 @@ import { HamalClient } from "./hamal-client";
 export default async function HamalPage() {
   await requireTab("hamal");
   const profile = await getCurrentProfile();
-  return <HamalClient isAdmin={profile?.is_admin ?? false} />;
+  return (
+    <HamalClient
+      isAdmin={profile?.is_admin ?? false}
+      userPhone={profile?.phone ?? null}
+    />
+  );
 }

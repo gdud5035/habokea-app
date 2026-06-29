@@ -126,6 +126,7 @@ export type AppSettingUpdate = Partial<AppSettingInsert>;
 export type HamalSambatzRow = {
   id: string;
   full_name: string;
+  color: string | null;
   created_at: string;
 };
 export type HamalSambatzInsert = Omit<HamalSambatzRow, "id" | "created_at"> & {
