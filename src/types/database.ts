@@ -113,6 +113,43 @@ export type DroneInsert = Omit<DroneRow, "id" | "created_at"> & {
 };
 export type DroneUpdate = Partial<DroneInsert>;
 
+export type AppSettingRow = {
+  key: string;
+  value: string;
+  updated_at: string;
+};
+export type AppSettingInsert = Omit<AppSettingRow, "updated_at"> & {
+  updated_at?: string;
+};
+export type AppSettingUpdate = Partial<AppSettingInsert>;
+
+export type HamalSambatzRow = {
+  id: string;
+  full_name: string;
+  created_at: string;
+};
+export type HamalSambatzInsert = Omit<HamalSambatzRow, "id" | "created_at"> & {
+  id?: string;
+  created_at?: string;
+};
+export type HamalSambatzUpdate = Partial<HamalSambatzInsert>;
+
+export type HamalAssignmentRow = {
+  id: string;
+  shift_date: string;
+  slot_start_hour: number;
+  sambatz_id: string;
+  created_at: string;
+};
+export type HamalAssignmentInsert = Omit<
+  HamalAssignmentRow,
+  "id" | "created_at"
+> & {
+  id?: string;
+  created_at?: string;
+};
+export type HamalAssignmentUpdate = Partial<HamalAssignmentInsert>;
+
 type Table<R, I = Partial<R>, U = Partial<R>> = {
   Row: R;
   Insert: I;
@@ -132,6 +169,17 @@ export type Database = {
       drive_cards: Table<DriveCardRow, DriveCardInsert>;
       push_subscriptions: Table<PushSubscriptionRow>;
       drones: Table<DroneRow, DroneInsert, DroneUpdate>;
+      app_settings: Table<AppSettingRow, AppSettingInsert, AppSettingUpdate>;
+      hamal_sambatzim: Table<
+        HamalSambatzRow,
+        HamalSambatzInsert,
+        HamalSambatzUpdate
+      >;
+      hamal_assignments: Table<
+        HamalAssignmentRow,
+        HamalAssignmentInsert,
+        HamalAssignmentUpdate
+      >;
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

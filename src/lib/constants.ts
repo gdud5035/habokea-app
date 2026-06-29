@@ -30,6 +30,17 @@ export const TAB_ROUTES: Record<TabKey, string> = {
 // Profile is always accessible to any authenticated user.
 export const ALWAYS_ALLOWED_TABS: TabKey[] = ["profile"];
 
+// ---- Hebrew weekday names (JS getDay(): 0 = Sunday … 6 = Saturday) ----
+export const WEEKDAY_HE: Record<number, string> = {
+  0: "ראשון",
+  1: "שני",
+  2: "שלישי",
+  3: "רביעי",
+  4: "חמישי",
+  5: "שישי",
+  6: "שבת",
+};
+
 // ---- Vehicle enums ----
 export const VEHICLE_STATUSES = ["active", "garage", "disabled"] as const;
 export type VehicleStatus = (typeof VEHICLE_STATUSES)[number];
