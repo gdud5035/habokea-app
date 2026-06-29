@@ -18,8 +18,13 @@ import {
   textOn,
   weekDays,
   HOME_SLOT,
+  DAY_TEXT_ROWS,
 } from "@/lib/utils/week";
-import type { HamalAssignmentRow, HamalSambatzRow } from "@/types/database";
+import type {
+  HamalAssignmentRow,
+  HamalDayTextRow,
+  HamalSambatzRow,
+} from "@/types/database";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -73,6 +78,13 @@ const styles = StyleSheet.create({
     borderLeftWidth: 1,
     borderLeftColor: "#ccc",
     textAlign: "center",
+    backgroundColor: "#e4e4e7",
+  },
+  specialCell: {
+    padding: 3,
+    borderLeftWidth: 1,
+    borderLeftColor: "#ccc",
+    textAlign: "right",
     backgroundColor: "#f4f4f5",
   },
   nameBox: {
@@ -120,16 +132,25 @@ export async function GET(req: Request) {
 
   const supabase = await createClient();
 
-  const [{ data: settingsData }, { data: sambatzimData }, { data: assignData }] =
-    await Promise.all([
-      supabase.from("app_settings").select("key, value"),
-      supabase.from("hamal_sambatzim").select("*"),
-      supabase
-        .from("hamal_assignments")
-        .select("*")
-        .gte("shift_date", startKey)
-        .lte("shift_date", endKey),
-    ]);
+  const [
+    { data: settingsData },
+    { data: sambatzimData },
+    { data: assignData },
+    { data: dayTextData },
+  ] = await Promise.all([
+    supabase.from("app_settings").select("key, value"),
+    supabase.from("hamal_sambatzim").select("*"),
+    supabase
+      .from("hamal_assignments")
+      .select("*")
+      .gte("shift_date", startKey)
+      .lte("shift_date", endKey),
+    supabase
+      .from("hamal_day_text")
+      .select("*")
+      .gte("shift_date", startKey)
+      .lte("shift_date", endKey),
+  ]);
 
   const settings = (settingsData as { key: string; value: string }[]) ?? [];
   const getSetting = (k: string, dflt: number) => {
@@ -138,11 +159,19 @@ export async function GET(req: Request) {
   };
   const length = getSetting("hamal_shift_length_hours", 8);
   const start = getSetting("hamal_day_start_hour", 0);
+  const showAttack =
+    settings.find((s) => s.key === "hamal_show_attack")?.value !== "false";
   const slots = computeSlots(length, start);
+  const textRows = DAY_TEXT_ROWS.filter(
+    (r) => r.kind !== "attack" || showAttack,
+  );
 
   const sambatzim = (sambatzimData as HamalSambatzRow[]) ?? [];
   const byId = new Map(sambatzim.map((s) => [s.id, s]));
   const assignments = (assignData as HamalAssignmentRow[]) ?? [];
+  const dayTexts = (dayTextData as HamalDayTextRow[]) ?? [];
+  const textByCell = new Map<string, string>();
+  dayTexts.forEach((t) => textByCell.set(`${t.shift_date}|${t.kind}`, t.content));
 
   const byCell = new Map<string, HamalAssignmentRow[]>();
   const homeByDate = new Map<string, HamalAssignmentRow[]>();
@@ -201,11 +230,32 @@ export async function GET(req: Request) {
     ...days.map((d) =>
       createElement(
         View,
-        { key: dateKey(d), style: [styles.cell, { width: DAY_W }] },
+        { key: dateKey(d), style: [styles.specialCell, { width: DAY_W }] },
         nameBoxes(homeByDate.get(dateKey(d)) ?? [], byId),
       ),
     ),
   ]);
+
+  const textRowEls = textRows.map((row) =>
+    createElement(View, { key: row.kind, style: styles.row }, [
+      createElement(
+        View,
+        { key: "lbl", style: [styles.labelCell, { width: TIME_W }] },
+        createElement(Text, { style: styles.bold }, row.label),
+      ),
+      ...days.map((d) =>
+        createElement(
+          View,
+          { key: dateKey(d), style: [styles.specialCell, { width: DAY_W }] },
+          createElement(
+            Text,
+            {},
+            textByCell.get(`${dateKey(d)}|${row.kind}`) ?? "",
+          ),
+        ),
+      ),
+    ]),
+  );
 
   const doc = createElement(
     Document,
@@ -223,6 +273,7 @@ export async function GET(req: Request) {
           createElement(View, { style: styles.headerRow, key: "head" }, headerCells),
           ...slotRows,
           homeRow,
+          ...textRowEls,
         ]),
       ],
     ),

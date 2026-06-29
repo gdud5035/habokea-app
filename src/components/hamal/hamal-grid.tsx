@@ -13,9 +13,14 @@ export interface HamalGridProps {
   /** key = dateKey → home (בבית) assignments for that day. */
   homeByDate: Map<string, HamalAssignmentRow[]>;
   sambatzById: Map<string, HamalSambatzRow>;
+  /** key = `${dateKey}|${kind}` → free-text content (הערות / התקפי). */
+  textByCell: Map<string, string>;
+  /** which free-text rows to render (התקפי can be toggled off). */
+  textRows: { kind: string; label: string }[];
   todayKey: string;
   onCellClick: (date: Date, slot: Slot) => void;
   onHomeClick: (date: Date) => void;
+  onTextClick: (date: Date, kind: string, label: string) => void;
 }
 
 function cellKey(dk: string, startHour: number): string {
@@ -43,9 +48,12 @@ export function HamalGrid({
   assignmentsByCell,
   homeByDate,
   sambatzById,
+  textByCell,
+  textRows,
   todayKey,
   onCellClick,
   onHomeClick,
+  onTextClick,
 }: HamalGridProps) {
   return (
     <div className="overflow-x-auto rounded-md border" dir="rtl">
@@ -129,22 +137,18 @@ export function HamalGrid({
             </tr>
           ))}
 
-          {/* בבית row */}
+          {/* בבית row (special — greyish) */}
           <tr>
-            <th className="sticky right-0 z-10 border-l bg-muted/30 p-2 text-center text-xs font-medium whitespace-nowrap text-muted-foreground">
+            <th className="sticky right-0 z-10 border-t-2 border-l border-t-border bg-muted/70 p-2 text-center text-xs font-medium whitespace-nowrap text-muted-foreground">
               בבית
             </th>
             {days.map((d) => {
               const dk = dateKey(d);
-              const isToday = dk === todayKey;
               const rows = homeByDate.get(dk) ?? [];
               return (
                 <td
                   key={dk}
-                  className={cn(
-                    "border-l p-1 align-top last:border-l-0",
-                    isToday && "bg-primary/5",
-                  )}
+                  className="border-t-2 border-l border-t-border bg-muted/40 p-1 align-top last:border-l-0"
                 >
                   <button
                     type="button"
@@ -166,6 +170,36 @@ export function HamalGrid({
               );
             })}
           </tr>
+
+          {/* free-text rows (הערות / התקפי) — special, greyish */}
+          {textRows.map((row) => (
+            <tr key={row.kind}>
+              <th className="sticky right-0 z-10 border-l bg-muted/70 p-2 text-center text-xs font-medium whitespace-nowrap text-muted-foreground">
+                {row.label}
+              </th>
+              {days.map((d) => {
+                const dk = dateKey(d);
+                const content = textByCell.get(`${dk}|${row.kind}`) ?? "";
+                return (
+                  <td
+                    key={dk}
+                    className="border-l bg-muted/40 p-1 align-top last:border-l-0"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => onTextClick(d, row.kind, row.label)}
+                      className={cn(
+                        "flex h-full min-h-10 w-full cursor-pointer rounded-md p-1.5 text-right text-xs whitespace-pre-wrap transition-colors hover:bg-accent",
+                        !content && "text-muted-foreground/60",
+                      )}
+                    >
+                      {content || `+ ${row.label}`}
+                    </button>
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
         </tbody>
       </table>
     </div>

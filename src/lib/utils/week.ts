@@ -31,6 +31,12 @@ function pad(n: number): string {
 // Sentinel slot_start_hour value for the "בבית" (home) row.
 export const HOME_SLOT = -1;
 
+// Free-text day rows (stored in hamal_day_text by `kind`).
+export const DAY_TEXT_ROWS: { kind: string; label: string }[] = [
+  { kind: "note", label: "הערות" },
+  { kind: "attack", label: "התקפי" },
+];
+
 // Tile a 24h day into slots of `shiftLengthHours`, starting at `startHour`.
 // Slots wrap past midnight; a slot's `startHour` is the clock hour (0-23).
 export function computeSlots(shiftLengthHours: number, startHour = 0): Slot[] {

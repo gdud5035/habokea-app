@@ -12,10 +12,12 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 
 export interface ShiftSettings {
   length: number;
   start: number;
+  showAttack: boolean;
 }
 
 export interface ShiftSettingsDialogProps {
@@ -33,6 +35,7 @@ export function ShiftSettingsDialog({
 }: ShiftSettingsDialogProps) {
   const [length, setLength] = useState(String(current.length));
   const [start, setStart] = useState(String(current.start));
+  const [showAttack, setShowAttack] = useState(current.showAttack);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -46,7 +49,7 @@ export function ShiftSettingsDialog({
       toast.error("שעת ההתחלה חייבת להיות בין 0 ל-23");
       return;
     }
-    onSave({ length: len, start: st });
+    onSave({ length: len, start: st, showAttack });
   }
 
   return (
@@ -83,6 +86,15 @@ export function ShiftSettingsDialog({
               חלוקת המשמרות מתחילה משעה זו. שינוי ההגדרות מחלק מחדש את לוח השבוע;
               שיבוצים שאינם מתיישרים לשעת התחלה חדשה לא יוצגו.
             </p>
+          </div>
+
+          <div className="flex items-center justify-between gap-2">
+            <Label htmlFor="show-attack">הצג שורת התקפי</Label>
+            <Switch
+              id="show-attack"
+              checked={showAttack}
+              onCheckedChange={setShowAttack}
+            />
           </div>
 
           <DialogFooter className="gap-2 sm:gap-2">

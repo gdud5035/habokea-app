@@ -151,6 +151,22 @@ export type HamalAssignmentInsert = Omit<
 };
 export type HamalAssignmentUpdate = Partial<HamalAssignmentInsert>;
 
+export type HamalDayTextRow = {
+  id: string;
+  shift_date: string;
+  kind: string; // 'note' | 'attack'
+  content: string;
+  updated_at: string;
+};
+export type HamalDayTextInsert = Omit<
+  HamalDayTextRow,
+  "id" | "updated_at"
+> & {
+  id?: string;
+  updated_at?: string;
+};
+export type HamalDayTextUpdate = Partial<HamalDayTextInsert>;
+
 type Table<R, I = Partial<R>, U = Partial<R>> = {
   Row: R;
   Insert: I;
@@ -180,6 +196,11 @@ export type Database = {
         HamalAssignmentRow,
         HamalAssignmentInsert,
         HamalAssignmentUpdate
+      >;
+      hamal_day_text: Table<
+        HamalDayTextRow,
+        HamalDayTextInsert,
+        HamalDayTextUpdate
       >;
     };
     Views: Record<string, never>;

@@ -26,6 +26,7 @@ import {
   getWeekStart,
   weekDays,
   HOME_SLOT,
+  DAY_TEXT_ROWS,
   type Slot,
 } from "@/lib/utils/week";
 import {
@@ -34,6 +35,7 @@ import {
 } from "@/lib/hamal-report";
 import type {
   HamalAssignmentRow,
+  HamalDayTextRow,
   HamalSambatzRow,
 } from "@/types/database";
 import { Button } from "@/components/ui/button";
@@ -46,13 +48,15 @@ import {
   type ShiftSettings,
 } from "@/components/hamal/shift-settings-dialog";
 import { HomeDialog } from "@/components/hamal/home-dialog";
+import { DayTextDialog } from "@/components/hamal/day-text-dialog";
 import { ShiftCountsTable } from "@/components/hamal/shift-counts-table";
 
-const DEFAULTS: ShiftSettings = { length: 8, start: 0 };
+const DEFAULTS: ShiftSettings = { length: 8, start: 0, showAttack: true };
 const SETTINGS_KEY = ["hamal_settings"] as const;
 const SAMBATZIM_KEY = ["hamal_sambatzim"] as const;
 const LENGTH_SETTING = "hamal_shift_length_hours";
 const START_SETTING = "hamal_day_start_hour";
+const SHOW_ATTACK_SETTING = "hamal_show_attack";
 
 const supabase = () => createClient();
 
@@ -79,7 +83,7 @@ async function fetchSettings(): Promise<ShiftSettings> {
   const { data, error } = await supabase()
     .from("app_settings")
     .select("key, value")
-    .in("key", [LENGTH_SETTING, START_SETTING]);
+    .in("key", [LENGTH_SETTING, START_SETTING, SHOW_ATTACK_SETTING]);
   if (error) throw error;
   const rows = (data as { key: string; value: string }[] | null) ?? [];
   const num = (k: string, dflt: number) => {
@@ -89,6 +93,7 @@ async function fetchSettings(): Promise<ShiftSettings> {
   return {
     length: num(LENGTH_SETTING, DEFAULTS.length),
     start: num(START_SETTING, DEFAULTS.start),
+    showAttack: rows.find((r) => r.key === SHOW_ATTACK_SETTING)?.value !== "false",
   };
 }
 
@@ -114,6 +119,19 @@ async function fetchAssignments(
   return data ?? [];
 }
 
+async function fetchDayText(
+  startKey: string,
+  endKey: string,
+): Promise<HamalDayTextRow[]> {
+  const { data, error } = await supabase()
+    .from("hamal_day_text")
+    .select("*")
+    .gte("shift_date", startKey)
+    .lte("shift_date", endKey);
+  if (error) throw error;
+  return data ?? [];
+}
+
 // ------------------------------------------------------------------
 // Inner component
 // ------------------------------------------------------------------
@@ -132,6 +150,11 @@ function HamalInner({
     null,
   );
   const [homeCtx, setHomeCtx] = useState<Date | null>(null);
+  const [textCtx, setTextCtx] = useState<{
+    date: Date;
+    kind: string;
+    label: string;
+  } | null>(null);
   const [sambatzimOpen, setSambatzimOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -141,6 +164,10 @@ function HamalInner({
   const todayKey = dateKey(new Date());
   const ASSIGNMENTS_KEY = useMemo(
     () => ["hamal_assignments", startKey] as const,
+    [startKey],
+  );
+  const DAY_TEXT_KEY = useMemo(
+    () => ["hamal_day_text", startKey] as const,
     [startKey],
   );
 
@@ -156,11 +183,19 @@ function HamalInner({
     queryKey: ASSIGNMENTS_KEY,
     queryFn: () => fetchAssignments(startKey, endKey),
   });
+  const dayTextQuery = useQuery({
+    queryKey: DAY_TEXT_KEY,
+    queryFn: () => fetchDayText(startKey, endKey),
+  });
 
   const settings = settingsQuery.data ?? DEFAULTS;
   const slots = useMemo(
     () => computeSlots(settings.length, settings.start),
     [settings.length, settings.start],
+  );
+  const textRows = useMemo(
+    () => DAY_TEXT_ROWS.filter((r) => r.kind !== "attack" || settings.showAttack),
+    [settings.showAttack],
   );
   const sambatzim = useMemo(
     () => sambatzimQuery.data ?? [],
@@ -205,6 +240,26 @@ function HamalInner({
     });
     return m;
   }, [allAssignments]);
+
+  const dayText = useMemo(
+    () => dayTextQuery.data ?? [],
+    [dayTextQuery.data],
+  );
+  const textByCell = useMemo(() => {
+    const m = new Map<string, string>();
+    dayText.forEach((t) => m.set(`${t.shift_date}|${t.kind}`, t.content));
+    return m;
+  }, [dayText]);
+  const dayTextByDate = useMemo(() => {
+    const m = new Map<string, { note?: string; attack?: string }>();
+    dayText.forEach((t) => {
+      const entry = m.get(t.shift_date) ?? {};
+      if (t.kind === "note") entry.note = t.content;
+      else if (t.kind === "attack") entry.attack = t.content;
+      m.set(t.shift_date, entry);
+    });
+    return m;
+  }, [dayText]);
 
   const countById = useMemo(() => {
     const m = new Map<string, number>();
@@ -312,6 +367,42 @@ function HamalInner({
     },
   });
 
+  const saveDayText = useMutation({
+    mutationFn: async ({
+      dk,
+      kind,
+      content,
+    }: {
+      dk: string;
+      kind: string;
+      content: string;
+    }) => {
+      const client = supabase();
+      if (!content) {
+        const { error } = await client
+          .from("hamal_day_text")
+          .delete()
+          .eq("shift_date", dk)
+          .eq("kind", kind);
+        if (error) throw error;
+      } else {
+        const { error } = await client.from("hamal_day_text").upsert(
+          {
+            shift_date: dk,
+            kind,
+            content,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "shift_date,kind" },
+        );
+        if (error) throw error;
+      }
+    },
+    onError: () => toast.error("השמירה נכשלה"),
+    onSuccess: () => toast.success("נשמר"),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: DAY_TEXT_KEY }),
+  });
+
   const updateSettings = useMutation({
     mutationFn: async (next: ShiftSettings) => {
       const { error } = await supabase()
@@ -326,6 +417,11 @@ function HamalInner({
             {
               key: START_SETTING,
               value: String(next.start),
+              updated_at: new Date().toISOString(),
+            },
+            {
+              key: SHOW_ATTACK_SETTING,
+              value: next.showAttack ? "true" : "false",
               updated_at: new Date().toISOString(),
             },
           ],
@@ -349,8 +445,16 @@ function HamalInner({
   };
 
   const handleWhatsApp = () => {
-    const roster = buildWeekRoster(days, slots, allAssignments, nameById);
-    const msg = formatWhatsAppMessage(roster);
+    const roster = buildWeekRoster(
+      days,
+      slots,
+      allAssignments,
+      nameById,
+      dayTextByDate,
+    );
+    const msg = formatWhatsAppMessage(roster, {
+      showAttack: settings.showAttack,
+    });
     const intl = waNumber(userPhone);
     if (!intl) {
       toast.error("לא מוגדר מספר טלפון בפרופיל — נפתחה בחירת איש קשר");
@@ -363,7 +467,8 @@ function HamalInner({
   if (
     settingsQuery.isLoading ||
     sambatzimQuery.isLoading ||
-    assignmentsQuery.isLoading
+    assignmentsQuery.isLoading ||
+    dayTextQuery.isLoading
   ) {
     return <TableSkeleton />;
   }
@@ -447,9 +552,12 @@ function HamalInner({
         assignmentsByCell={assignmentsByCell}
         homeByDate={homeByDate}
         sambatzById={sambatzById}
+        textByCell={textByCell}
+        textRows={textRows}
         todayKey={todayKey}
         onCellClick={(date, slot) => setAssignCtx({ date, slot })}
         onHomeClick={(date) => setHomeCtx(date)}
+        onTextClick={(date, kind, label) => setTextCtx({ date, kind, label })}
       />
 
       <ShiftCountsTable sambatzim={sambatzim} countById={countById} />
@@ -493,6 +601,31 @@ function HamalInner({
             });
           }
           setHomeCtx(null);
+        }}
+      />
+
+      <DayTextDialog
+        open={textCtx !== null}
+        contextLabel={
+          textCtx
+            ? `${textCtx.label} — ${WEEKDAY_HE[textCtx.date.getDay()]} ${ddmm(textCtx.date)}`
+            : ""
+        }
+        value={
+          textCtx
+            ? textByCell.get(`${dateKey(textCtx.date)}|${textCtx.kind}`) ?? ""
+            : ""
+        }
+        onClose={() => setTextCtx(null)}
+        onSave={(content) => {
+          if (textCtx) {
+            saveDayText.mutate({
+              dk: dateKey(textCtx.date),
+              kind: textCtx.kind,
+              content,
+            });
+          }
+          setTextCtx(null);
         }}
       />
 

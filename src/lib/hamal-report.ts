@@ -11,6 +11,8 @@ export type RosterDay = {
   ddmm: string;
   cells: RosterCell[];
   home: string[];
+  note: string;
+  attack: string;
 };
 
 function ddmm(d: Date): string {
@@ -25,6 +27,7 @@ export function buildWeekRoster(
   slots: Slot[],
   assignments: HamalAssignmentRow[],
   nameById: Map<string, string>,
+  dayText?: Map<string, { note?: string; attack?: string }>,
 ): RosterDay[] {
   const byCell = new Map<string, string[]>();
   const homeByDate = new Map<string, string[]>();
@@ -44,6 +47,7 @@ export function buildWeekRoster(
 
   return days.map((date) => {
     const dk = dateKey(date);
+    const text = dayText?.get(dk);
     return {
       date,
       weekday: WEEKDAY_HE[date.getDay()],
@@ -53,12 +57,18 @@ export function buildWeekRoster(
         names: byCell.get(`${dk}|${slot.startHour}`) ?? [],
       })),
       home: homeByDate.get(dk) ?? [],
+      note: text?.note ?? "",
+      attack: text?.attack ?? "",
     };
   });
 }
 
 // Format the week roster as a WhatsApp message (Hebrew, RTL-friendly).
-export function formatWhatsAppMessage(roster: RosterDay[]): string {
+export function formatWhatsAppMessage(
+  roster: RosterDay[],
+  opts: { showAttack?: boolean } = {},
+): string {
+  const showAttack = opts.showAttack !== false;
   if (roster.length === 0) return "";
   const first = roster[0];
   const last = roster[roster.length - 1];
@@ -74,6 +84,12 @@ export function formatWhatsAppMessage(roster: RosterDay[]): string {
     }
     if (day.home.length) {
       lines.push(`🏠 בבית: ${day.home.join(", ")}`);
+    }
+    if (day.note) {
+      lines.push(`📝 הערות: ${day.note}`);
+    }
+    if (showAttack && day.attack) {
+      lines.push(`⚔️ התקפי: ${day.attack}`);
     }
   }
 
