@@ -9,6 +9,7 @@ import {
   Font,
 } from "@react-pdf/renderer";
 import { createElement } from "react";
+import { join } from "node:path";
 import { WEEKDAY_HE } from "@/lib/constants";
 import {
   computeSlots,
@@ -23,20 +24,27 @@ import type { HamalAssignmentRow, HamalSambatzRow } from "@/types/database";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// Bundled Hebrew-capable static TTFs (public/fonts). The previous Google
+// "Heebo" URL was a Latin-only subset, which rendered Hebrew as tofu.
+const fontDir = join(process.cwd(), "public", "fonts");
 Font.register({
-  family: "Heebo",
-  src: "https://fonts.gstatic.com/s/heebo/v26/NGSpv5_NC0k9P_v6ZUCbLRAHxK1EiSysdUmj.ttf",
+  family: "Alef",
+  fonts: [
+    { src: join(fontDir, "Alef-Regular.ttf"), fontWeight: "normal" },
+    { src: join(fontDir, "Alef-Bold.ttf"), fontWeight: "bold" },
+  ],
 });
 
 const styles = StyleSheet.create({
   page: {
-    fontFamily: "Heebo",
+    fontFamily: "Alef",
     fontSize: 9,
     padding: 24,
     direction: "rtl",
     textAlign: "right",
   },
-  title: { fontSize: 16, marginBottom: 12, textAlign: "right" },
+  title: { fontSize: 16, marginBottom: 12, textAlign: "right", fontWeight: "bold" },
+  bold: { fontWeight: "bold" },
   table: {
     width: "auto",
     borderStyle: "solid",
@@ -152,7 +160,7 @@ export async function GET(req: Request) {
     createElement(
       View,
       { key: "h-time", style: [styles.labelCell, { width: TIME_W }] },
-      createElement(Text, {}, "שעות"),
+      createElement(Text, { style: styles.bold }, "שעות"),
     ),
     ...days.map((d) =>
       createElement(
@@ -160,7 +168,7 @@ export async function GET(req: Request) {
         { key: `h-${dateKey(d)}`, style: [styles.cell, { width: DAY_W }] },
         createElement(
           Text,
-          {},
+          { style: styles.bold },
           `${WEEKDAY_HE[d.getDay()]} ${d.getDate().toString().padStart(2, "0")}/${(d.getMonth() + 1).toString().padStart(2, "0")}`,
         ),
       ),
@@ -172,7 +180,7 @@ export async function GET(req: Request) {
       createElement(
         View,
         { key: "lbl", style: [styles.labelCell, { width: TIME_W }] },
-        createElement(Text, {}, slot.label),
+        createElement(Text, { style: styles.bold }, slot.label),
       ),
       ...days.map((d) =>
         createElement(
@@ -188,7 +196,7 @@ export async function GET(req: Request) {
     createElement(
       View,
       { key: "lbl", style: [styles.labelCell, { width: TIME_W }] },
-      createElement(Text, {}, "בבית"),
+      createElement(Text, { style: styles.bold }, "בבית"),
     ),
     ...days.map((d) =>
       createElement(
