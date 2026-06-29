@@ -62,18 +62,20 @@ export function formatWhatsAppMessage(roster: RosterDay[]): string {
   if (roster.length === 0) return "";
   const first = roster[0];
   const last = roster[roster.length - 1];
-  let msg = `*שבצק חמל — ${first.ddmm}–${last.ddmm}*\n\n`;
+
+  const lines: string[] = [`📋 *שבצק חמל* ${first.ddmm}–${last.ddmm}`];
 
   for (const day of roster) {
-    msg += `*${day.weekday} ${day.ddmm}*\n`;
+    lines.push(""); // blank line separates days for readability
+    lines.push(`*${day.weekday} ${day.ddmm}*`);
     for (const cell of day.cells) {
       const names = cell.names.length ? cell.names.join(", ") : "—";
-      msg += `${cell.slot.label}: ${names}\n`;
+      lines.push(`🕐 ${cell.slot.label}  ${names}`);
     }
     if (day.home.length) {
-      msg += `בבית: ${day.home.join(", ")}\n`;
+      lines.push(`🏠 בבית: ${day.home.join(", ")}`);
     }
-    msg += `\n`;
   }
-  return msg.trim();
+
+  return lines.join("\n");
 }

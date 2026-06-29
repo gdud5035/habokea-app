@@ -99,7 +99,7 @@ export function HamalGrid({
                       type="button"
                       onClick={() => onCellClick(d, slot)}
                       className={cn(
-                        "flex h-full min-h-14 w-full flex-col gap-1 rounded-md p-1.5 text-right transition-colors",
+                        "flex h-full min-h-14 w-full cursor-pointer flex-col gap-1 rounded-md p-1.5 text-right transition-colors",
                         rows.length === 0
                           ? "text-muted-foreground/60 hover:bg-accent"
                           : "hover:bg-accent",
@@ -150,7 +150,7 @@ export function HamalGrid({
                     type="button"
                     onClick={() => onHomeClick(d)}
                     className={cn(
-                      "flex h-full min-h-12 w-full flex-wrap gap-1 rounded-md p-1.5 text-right transition-colors hover:bg-accent",
+                      "flex h-full min-h-12 w-full cursor-pointer flex-wrap gap-1 rounded-md p-1.5 text-right transition-colors hover:bg-accent",
                       rows.length === 0 && "text-muted-foreground/60",
                     )}
                   >

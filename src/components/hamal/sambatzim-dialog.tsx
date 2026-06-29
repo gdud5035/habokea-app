@@ -42,7 +42,7 @@ function Swatches({
           type="button"
           onClick={() => onPick(c)}
           className={cn(
-            "flex size-6 items-center justify-center rounded-full border transition-transform hover:scale-110",
+            "flex size-6 cursor-pointer items-center justify-center rounded-full border transition-transform hover:scale-110",
             value === c && "ring-2 ring-foreground ring-offset-1",
           )}
           style={{ backgroundColor: c }}
@@ -134,7 +134,7 @@ export function SambatzimDialog({
                         onClick={() =>
                           setEditingId((id) => (id === s.id ? null : s.id))
                         }
-                        className="size-5 shrink-0 rounded-full border"
+                        className="size-5 shrink-0 cursor-pointer rounded-full border"
                         style={{ backgroundColor: s.color ?? "transparent" }}
                         title="שנה צבע"
                       />
