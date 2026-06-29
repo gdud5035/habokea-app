@@ -80,7 +80,9 @@ export function formatWhatsAppMessage(
     lines.push(`*${day.weekday} ${day.ddmm}*`);
     for (const cell of day.cells) {
       const names = cell.names.length ? cell.names.join(", ") : "—";
-      lines.push(`🕐 ${cell.slot.label}  ${names}`);
+      lines.push(
+        `🕐 התחלה ${cell.slot.startLabel} סיום ${cell.slot.endLabel}: ${names}`,
+      );
     }
     if (day.home.length) {
       lines.push(`🏠 בבית: ${day.home.join(", ")}`);

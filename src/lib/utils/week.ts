@@ -4,7 +4,9 @@ import { formatDateForInput } from "@/lib/utils/format";
 export type Slot = {
   startHour: number; // 0-23, the slot's start hour
   endHour: number; // 1-24
-  label: string; // e.g. "08:00–16:00"
+  startLabel: string; // e.g. "08:00"
+  endLabel: string; // e.g. "16:00"
+  label: string; // e.g. "08:00–16:00" (compact)
 };
 
 // Add `n` days to a date (returns a new Date at local midnight).
@@ -48,10 +50,14 @@ export function computeSlots(shiftLengthHours: number, startHour = 0): Slot[] {
     const start = (start0 + i * len) % 24;
     const endRaw = start + len;
     const endClock = endRaw % 24 === 0 ? 24 : endRaw % 24;
+    const startLabel = `${pad(start)}:00`;
+    const endLabel = `${pad(endClock)}:00`;
     slots.push({
       startHour: start,
       endHour: endClock,
-      label: `${pad(start)}:00–${pad(endClock)}:00`,
+      startLabel,
+      endLabel,
+      label: `${startLabel}–${endLabel}`,
     });
   }
   return slots;

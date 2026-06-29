@@ -87,7 +87,10 @@ export function HamalGrid({
           {slots.map((slot) => (
             <tr key={slot.startHour}>
               <th className="sticky right-0 z-10 border-b border-l bg-muted/30 p-2 text-center text-xs font-medium whitespace-nowrap text-muted-foreground">
-                {slot.label}
+                <div className="flex flex-col gap-0.5 leading-tight">
+                  <span>התחלה: {slot.startLabel}</span>
+                  <span>סיום: {slot.endLabel}</span>
+                </div>
               </th>
               {days.map((d) => {
                 const dk = dateKey(d);

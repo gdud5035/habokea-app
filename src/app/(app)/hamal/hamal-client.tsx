@@ -566,7 +566,7 @@ function HamalInner({
         open={assignCtx !== null}
         contextLabel={
           assignCtx
-            ? `${WEEKDAY_HE[assignCtx.date.getDay()]} ${ddmm(assignCtx.date)} · ${assignCtx.slot.label}`
+            ? `${WEEKDAY_HE[assignCtx.date.getDay()]} ${ddmm(assignCtx.date)} · התחלה ${assignCtx.slot.startLabel} סיום ${assignCtx.slot.endLabel}`
             : ""
         }
         sambatzim={sambatzim}

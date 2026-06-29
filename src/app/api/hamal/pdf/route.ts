@@ -209,7 +209,14 @@ export async function GET(req: Request) {
       createElement(
         View,
         { key: "lbl", style: [styles.labelCell, { width: TIME_W }] },
-        createElement(Text, { style: styles.bold }, slot.label),
+        [
+          createElement(
+            Text,
+            { key: "s", style: styles.bold },
+            `התחלה: ${slot.startLabel}`,
+          ),
+          createElement(Text, { key: "e" }, `סיום: ${slot.endLabel}`),
+        ],
       ),
       ...days.map((d) =>
         createElement(
