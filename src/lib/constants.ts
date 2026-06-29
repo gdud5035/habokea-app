@@ -44,6 +44,16 @@ export const HAMAL_COLORS: string[] = [
   "#6366f1", // indigo
   "#a855f7", // purple
   "#ec4899", // pink
+  "#dc2626", // dark red
+  "#b45309", // brown
+  "#65a30d", // olive
+  "#047857", // emerald
+  "#0e7490", // dark cyan
+  "#1d4ed8", // dark blue
+  "#7c3aed", // violet
+  "#9d174d", // maroon
+  "#78716c", // stone
+  "#475569", // slate
 ];
 
 // ---- Hebrew weekday names (JS getDay(): 0 = Sunday … 6 = Saturday) ----

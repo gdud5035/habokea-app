@@ -283,6 +283,19 @@ function HamalInner({
     onSettled: () => queryClient.invalidateQueries({ queryKey: SAMBATZIM_KEY }),
   });
 
+  const renameSambatz = useMutation({
+    mutationFn: async ({ id, full_name }: { id: string; full_name: string }) => {
+      const { error } = await supabase()
+        .from("hamal_sambatzim")
+        .update({ full_name })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onError: () => toast.error("עדכון השם נכשל"),
+    onSuccess: () => toast.success("השם עודכן"),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: SAMBATZIM_KEY }),
+  });
+
   const deleteSambatz = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase()
@@ -490,6 +503,7 @@ function HamalInner({
         onAdd={(full_name, color) => addSambatz.mutate({ full_name, color })}
         onDelete={(id) => deleteSambatz.mutate(id)}
         onSetColor={(id, color) => setSambatzColor.mutate({ id, color })}
+        onRename={(id, full_name) => renameSambatz.mutate({ id, full_name })}
       />
 
       {isAdmin && (

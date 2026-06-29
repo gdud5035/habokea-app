@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { Trash2, Check } from "lucide-react";
+import { Trash2, Check, Pencil, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -24,6 +24,7 @@ export interface SambatzimDialogProps {
   onAdd: (fullName: string, color: string) => void;
   onDelete: (id: string) => void;
   onSetColor: (id: string, color: string) => void;
+  onRename: (id: string, fullName: string) => void;
 }
 
 function Swatches({
@@ -63,10 +64,28 @@ export function SambatzimDialog({
   onAdd,
   onDelete,
   onSetColor,
+  onRename,
 }: SambatzimDialogProps) {
   const [name, setName] = useState("");
   const [newColor, setNewColor] = useState<string>(HAMAL_COLORS[0]);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+
+  function startRename(s: HamalSambatzRow) {
+    setRenamingId(s.id);
+    setRenameValue(s.full_name);
+  }
+
+  function submitRename(id: string) {
+    const trimmed = renameValue.trim();
+    if (!trimmed) {
+      toast.error("יש להזין שם מלא");
+      return;
+    }
+    onRename(id, trimmed);
+    setRenamingId(null);
+  }
 
   function handleAdd(e: React.FormEvent) {
     e.preventDefault();
@@ -109,7 +128,7 @@ export function SambatzimDialog({
               {sambatzim.map((s) => (
                 <li key={s.id} className="px-3 py-2">
                   <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-1 items-center gap-2">
                       <button
                         type="button"
                         onClick={() =>
@@ -119,24 +138,72 @@ export function SambatzimDialog({
                         style={{ backgroundColor: s.color ?? "transparent" }}
                         title="שנה צבע"
                       />
-                      <span className="text-sm">{s.full_name}</span>
+                      {renamingId === s.id ? (
+                        <Input
+                          autoFocus
+                          value={renameValue}
+                          onChange={(e) => setRenameValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              submitRename(s.id);
+                            } else if (e.key === "Escape") {
+                              setRenamingId(null);
+                            }
+                          }}
+                          className="h-8 flex-1"
+                        />
+                      ) : (
+                        <span className="text-sm">{s.full_name}</span>
+                      )}
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      title="מחק"
-                      onClick={() => {
-                        if (
-                          window.confirm(
-                            `למחוק את ${s.full_name}? כל השיבוצים שלו יוסרו.`,
-                          )
-                        ) {
-                          onDelete(s.id);
-                        }
-                      }}
-                    >
-                      <Trash2 className="size-4" />
-                    </Button>
+                    {renamingId === s.id ? (
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="שמור"
+                          onClick={() => submitRename(s.id)}
+                        >
+                          <Check className="size-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="ביטול"
+                          onClick={() => setRenamingId(null)}
+                        >
+                          <X className="size-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="ערוך שם"
+                          onClick={() => startRename(s)}
+                        >
+                          <Pencil className="size-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="מחק"
+                          onClick={() => {
+                            if (
+                              window.confirm(
+                                `למחוק את ${s.full_name}? כל השיבוצים שלו יוסרו.`,
+                              )
+                            ) {
+                              onDelete(s.id);
+                            }
+                          }}
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
                   {editingId === s.id && (
                     <div className="pt-2">
