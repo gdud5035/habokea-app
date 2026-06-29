@@ -1,0 +1,15 @@
+-- "שבצק חמל" (hamal) tab — access control only.
+--
+-- Unlike the drones tab, we deliberately do NOT grant this tab to the
+-- standard "משתמש" role. role_tab_access / user_tab_overrides use a free-text
+-- tab_key, so no schema change is needed to make a new tab grantable.
+--
+-- Result: regular users have NO access by default. Admins (who get every tab
+-- automatically) grant it per-user via /admin → משתמשים → tab override, or
+-- per-role via /admin → תפקידים והרשאות.
+--
+-- The actual public.hamal* data table(s) + RLS + GRANTs will be added in a
+-- follow-up migration once the screen's content/data model is defined
+-- (mirroring 0005_drones.sql).
+
+-- (intentionally no-op: no role_tab_access insert for "משתמש")

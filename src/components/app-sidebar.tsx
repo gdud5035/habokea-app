@@ -3,13 +3,14 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { Car, Plane, ClipboardList, MessageSquare, Shield, User } from "lucide-react";
+import { Car, Plane, ListChecks, ClipboardList, MessageSquare, Shield, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TAB_LABELS, TAB_ROUTES, type TabKey } from "@/lib/constants";
 
 const ICONS: Record<TabKey, React.ElementType> = {
   vehicles: Car,
   drones: Plane,
+  hamal: ListChecks,
   drive_card: ClipboardList,
   whatsapp: MessageSquare,
   admin: Shield,
@@ -17,7 +18,7 @@ const ICONS: Record<TabKey, React.ElementType> = {
 };
 
 // Order tabs are shown in the nav.
-const NAV_ORDER: TabKey[] = ["vehicles", "drones", "drive_card", "whatsapp", "admin", "profile"];
+const NAV_ORDER: TabKey[] = ["vehicles", "drones", "hamal", "drive_card", "whatsapp", "admin", "profile"];
 
 export function AppSidebar({ allowedTabs }: { allowedTabs: TabKey[] }) {
   const pathname = usePathname();
