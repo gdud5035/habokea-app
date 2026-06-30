@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import { WEEKDAY_HE } from "@/lib/constants";
-import { dateKey, textOn, type Slot } from "@/lib/utils/week";
+import { dateKey, effectiveShiftDate, textOn, type Slot } from "@/lib/utils/week";
 import type { HamalAssignmentRow, HamalSambatzRow } from "@/types/database";
 
 export interface HamalGridProps {
@@ -90,13 +90,20 @@ export function HamalGrid({
                 <div className="flex flex-col gap-0.5 leading-tight">
                   <span>התחלה: {slot.startLabel}</span>
                   <span>סיום: {slot.endLabel}</span>
+                  {slot.dayOffset > 0 && (
+                    <span className="text-[10px] font-normal text-muted-foreground/70">
+                      (למחרת)
+                    </span>
+                  )}
                 </div>
               </th>
               {days.map((d) => {
                 const dk = dateKey(d);
                 const isToday = dk === todayKey;
                 const rows =
-                  assignmentsByCell.get(cellKey(dk, slot.startHour)) ?? [];
+                  assignmentsByCell.get(
+                    cellKey(effectiveShiftDate(d, slot), slot.startHour),
+                  ) ?? [];
                 const full = rows.length >= 2;
                 return (
                   <td

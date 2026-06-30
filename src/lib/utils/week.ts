@@ -7,6 +7,10 @@ export type Slot = {
   startLabel: string; // e.g. "08:00"
   endLabel: string; // e.g. "16:00"
   label: string; // e.g. "08:00–16:00" (compact)
+  // Days past the column date these hours fall on. With a non-midnight day
+  // start, slots that wrap past midnight (e.g. 00:00–08:00) belong to the
+  // *next* calendar day (offset 1) while still shown in the column's day.
+  dayOffset: number;
 };
 
 // Add `n` days to a date (returns a new Date at local midnight).
@@ -47,7 +51,8 @@ export function computeSlots(shiftLengthHours: number, startHour = 0): Slot[] {
   const count = Math.ceil(24 / len);
   const slots: Slot[] = [];
   for (let i = 0; i < count; i++) {
-    const start = (start0 + i * len) % 24;
+    const absStart = start0 + i * len;
+    const start = absStart % 24;
     const endRaw = start + len;
     const endClock = endRaw % 24 === 0 ? 24 : endRaw % 24;
     const startLabel = `${pad(start)}:00`;
@@ -58,6 +63,7 @@ export function computeSlots(shiftLengthHours: number, startHour = 0): Slot[] {
       startLabel,
       endLabel,
       label: `${startLabel}–${endLabel}`,
+      dayOffset: Math.floor(absStart / 24),
     });
   }
   return slots;
@@ -66,6 +72,12 @@ export function computeSlots(shiftLengthHours: number, startHour = 0): Slot[] {
 // YYYY-MM-DD key for a date (used as the DB `shift_date` value).
 export function dateKey(date: Date): string {
   return formatDateForInput(date);
+}
+
+// The actual calendar date (YYYY-MM-DD) a slot's hours fall on for a given
+// column day — accounts for slots that wrap past midnight into the next day.
+export function effectiveShiftDate(columnDate: Date, slot: Slot): string {
+  return dateKey(addDays(columnDate, slot.dayOffset));
 }
 
 // Pick a readable text color (black/white) for a given hex background.

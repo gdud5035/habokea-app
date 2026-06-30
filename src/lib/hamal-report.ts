@@ -1,7 +1,7 @@
 // Shared roster-building helpers for שבצק חמל (used by the WhatsApp message
 // and the PDF route). Pure functions — no React, no Supabase.
 import { WEEKDAY_HE } from "@/lib/constants";
-import { HOME_SLOT, dateKey, type Slot } from "@/lib/utils/week";
+import { HOME_SLOT, dateKey, effectiveShiftDate, type Slot } from "@/lib/utils/week";
 import type { HamalAssignmentRow } from "@/types/database";
 
 export type RosterCell = { slot: Slot; names: string[] };
@@ -54,7 +54,7 @@ export function buildWeekRoster(
       ddmm: ddmm(date),
       cells: slots.map((slot) => ({
         slot,
-        names: byCell.get(`${dk}|${slot.startHour}`) ?? [],
+        names: byCell.get(`${effectiveShiftDate(date, slot)}|${slot.startHour}`) ?? [],
       })),
       home: homeByDate.get(dk) ?? [],
       note: text?.note ?? "",

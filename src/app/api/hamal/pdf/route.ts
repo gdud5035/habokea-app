@@ -12,8 +12,10 @@ import { createElement } from "react";
 import { join } from "node:path";
 import { WEEKDAY_HE } from "@/lib/constants";
 import {
+  addDays,
   computeSlots,
   dateKey,
+  effectiveShiftDate,
   getWeekStart,
   textOn,
   weekDays,
@@ -144,7 +146,7 @@ export async function GET(req: Request) {
       .from("hamal_assignments")
       .select("*")
       .gte("shift_date", startKey)
-      .lte("shift_date", endKey),
+      .lte("shift_date", dateKey(addDays(days[6], 1))),
     supabase
       .from("hamal_day_text")
       .select("*")
@@ -222,7 +224,10 @@ export async function GET(req: Request) {
         createElement(
           View,
           { key: dateKey(d), style: [styles.cell, { width: DAY_W }] },
-          nameBoxes(byCell.get(`${dateKey(d)}|${slot.startHour}`) ?? [], byId),
+          nameBoxes(
+            byCell.get(`${effectiveShiftDate(d, slot)}|${slot.startHour}`) ?? [],
+            byId,
+          ),
         ),
       ),
     ]),

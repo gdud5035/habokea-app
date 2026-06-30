@@ -23,6 +23,7 @@ import {
   addDays,
   computeSlots,
   dateKey,
+  effectiveShiftDate,
   getWeekStart,
   weekDays,
   HOME_SLOT,
@@ -161,6 +162,9 @@ function HamalInner({
   const days = useMemo(() => weekDays(weekStart), [weekStart]);
   const startKey = dateKey(days[0]);
   const endKey = dateKey(days[6]);
+  // Shift assignments can land on the day after the last column (a wrapped
+  // 00:00–08:00 row belongs to the next calendar day), so fetch one day past.
+  const assignEndKey = dateKey(addDays(days[6], 1));
   const todayKey = dateKey(new Date());
   const ASSIGNMENTS_KEY = useMemo(
     () => ["hamal_assignments", startKey] as const,
@@ -181,7 +185,7 @@ function HamalInner({
   });
   const assignmentsQuery = useQuery({
     queryKey: ASSIGNMENTS_KEY,
-    queryFn: () => fetchAssignments(startKey, endKey),
+    queryFn: () => fetchAssignments(startKey, assignEndKey),
   });
   const dayTextQuery = useQuery({
     queryKey: DAY_TEXT_KEY,
@@ -261,14 +265,23 @@ function HamalInner({
     return m;
   }, [dayText]);
 
+  // Count shifts per סמבץ over exactly the displayed cells (each grid cell maps
+  // to a unique effective date+slot), so stray rows outside the week aren't
+  // counted and home (-1) is excluded.
   const countById = useMemo(() => {
     const m = new Map<string, number>();
-    allAssignments.forEach((a) => {
-      if (a.slot_start_hour === HOME_SLOT) return;
-      m.set(a.sambatz_id, (m.get(a.sambatz_id) ?? 0) + 1);
-    });
+    for (const d of days) {
+      for (const slot of slots) {
+        const rows = assignmentsByCell.get(
+          `${effectiveShiftDate(d, slot)}|${slot.startHour}`,
+        );
+        rows?.forEach((a) =>
+          m.set(a.sambatz_id, (m.get(a.sambatz_id) ?? 0) + 1),
+        );
+      }
+    }
     return m;
-  }, [allAssignments]);
+  }, [days, slots, assignmentsByCell]);
 
   // ---- Mutations ----
   // Used for both shift slots and the home row (slot_start_hour = -1).
@@ -476,7 +489,7 @@ function HamalInner({
   const ctxCurrentIds = assignCtx
     ? (
         assignmentsByCell.get(
-          `${dateKey(assignCtx.date)}|${assignCtx.slot.startHour}`,
+          `${effectiveShiftDate(assignCtx.date, assignCtx.slot)}|${assignCtx.slot.startHour}`,
         ) ?? []
       ).map((a) => a.sambatz_id)
     : [];
@@ -575,7 +588,7 @@ function HamalInner({
         onSave={(ids) => {
           if (assignCtx) {
             saveAssignments.mutate({
-              dk: dateKey(assignCtx.date),
+              dk: effectiveShiftDate(assignCtx.date, assignCtx.slot),
               startHour: assignCtx.slot.startHour,
               ids,
             });
