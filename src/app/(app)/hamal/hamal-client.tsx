@@ -51,7 +51,7 @@ import { HomeDialog } from "@/components/hamal/home-dialog";
 import { DayTextDialog } from "@/components/hamal/day-text-dialog";
 import { ShiftCountsTable } from "@/components/hamal/shift-counts-table";
 
-const DEFAULTS: ShiftSettings = { length: 8, start: 0, showAttack: true };
+const DEFAULTS: ShiftSettings = { length: 8, start: 8, showAttack: true };
 const SETTINGS_KEY = ["hamal_settings"] as const;
 const SAMBATZIM_KEY = ["hamal_sambatzim"] as const;
 const LENGTH_SETTING = "hamal_shift_length_hours";

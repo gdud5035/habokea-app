@@ -158,7 +158,7 @@ export async function GET(req: Request) {
     return Number.isFinite(n) ? n : dflt;
   };
   const length = getSetting("hamal_shift_length_hours", 8);
-  const start = getSetting("hamal_day_start_hour", 0);
+  const start = getSetting("hamal_day_start_hour", 8);
   const showAttack =
     settings.find((s) => s.key === "hamal_show_attack")?.value !== "false";
   const slots = computeSlots(length, start);
