@@ -63,6 +63,7 @@ export function getFieldValue(v: VehicleRow, field: string): unknown {
 
 const DATE_FIELDS = new Set([
   "km_last_update_at",
+  "updated_at",
   "next_treatment_date",
   "back_from_garage",
   "license_expiration",

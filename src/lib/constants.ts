@@ -74,7 +74,7 @@ export type VehicleStatus = (typeof VEHICLE_STATUSES)[number];
 export const VEHICLE_COMPANIES = ["A", "B", "C", "Mesayat", "Palsam", "Mafgad"] as const;
 export type VehicleCompany = (typeof VEHICLE_COMPANIES)[number];
 
-export const VEHICLE_SOURCES = ["yaram", "kavi", "yamah"] as const;
+export const VEHICLE_SOURCES = ["yaram", "kavi", "yamah", "rented"] as const;
 export type VehicleSource = (typeof VEHICLE_SOURCES)[number];
 
 // ---- Hebrew label maps (from the original app) ----
@@ -97,6 +97,7 @@ export const SOURCE_HE: Record<VehicleSource, string> = {
   yaram: 'יר"ם',
   kavi: "קווי",
   yamah: 'ימ"ח',
+  rented: "שכור",
 };
 
 // Default company sort order (Mafgad > A > B > C > Mesayat > Palsam).

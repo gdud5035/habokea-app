@@ -22,7 +22,7 @@ import {
   type VehicleCompany,
   type VehicleSource,
 } from "@/lib/constants";
-import { formatDateHebrew, formatDateForInput, isDateNear } from "@/lib/utils/format";
+import { formatDateHebrew, formatDateTimeHebrew, formatDateForInput, isDateNear } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
 import type { VehicleRow } from "@/types/database";
 
@@ -77,6 +77,7 @@ const COLUMNS: { field: string; label: string; sortable: boolean }[] = [
   { field: "treatment_freq", label: "תדירות טיפול", sortable: true },
   { field: "problem_desc", label: "תקלות", sortable: false },
   { field: "notes", label: "הערות", sortable: false },
+  { field: "updated_at", label: "עודכן לאחרונה", sortable: true },
   { field: "actions", label: "פעולות", sortable: false },
 ];
 
@@ -407,6 +408,11 @@ export function VehiclesTable({
                 {/* notes */}
                 <TableCell className="max-w-[200px] truncate">
                   {v.notes}
+                </TableCell>
+
+                {/* updated_at (read-only, auto-stamped) */}
+                <TableCell className="whitespace-nowrap text-muted-foreground">
+                  {formatDateTimeHebrew(v.updated_at)}
                 </TableCell>
 
                 {/* actions */}

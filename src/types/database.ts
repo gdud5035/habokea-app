@@ -31,11 +31,16 @@ export type VehicleRow = {
   no_orea: boolean | null;
   km_last_update_at: string | null;
   created_at: string;
+  updated_at: string;
 };
-export type VehicleInsert = Omit<VehicleRow, "id" | "created_at" | "km_last_update_at"> & {
+export type VehicleInsert = Omit<
+  VehicleRow,
+  "id" | "created_at" | "km_last_update_at" | "updated_at"
+> & {
   id?: string;
   created_at?: string;
   km_last_update_at?: string | null;
+  updated_at?: string;
 };
 export type VehicleUpdate = Partial<VehicleInsert>;
 
