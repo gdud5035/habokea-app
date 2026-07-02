@@ -105,6 +105,7 @@ export function TzalamTable({
       <Table dir="rtl">
         <TableHeader>
           <TableRow>
+            <TableHead className="text-center">נמצא</TableHead>
             <TableHead className="text-right">סוג האמצעי</TableHead>
             {showCompany && <TableHead className="text-right">פלוגה</TableHead>}
             {columns.map((c) => (
@@ -112,7 +113,6 @@ export function TzalamTable({
                 {c.label}
               </TableHead>
             ))}
-            <TableHead className="text-center">נמצא</TableHead>
             <TableHead className="text-center">פעולות</TableHead>
           </TableRow>
         </TableHeader>
@@ -134,6 +134,17 @@ export function TzalamTable({
                   </TableRow>
                 )}
                 <TableRow>
+                  <TableCell className="text-center">
+                    <div className="flex justify-center">
+                      <Checkbox
+                        checked={present}
+                        disabled={!editable}
+                        onCheckedChange={(c: boolean) =>
+                          onToggle(item, Boolean(c))
+                        }
+                      />
+                    </div>
+                  </TableCell>
                   <TableCell className="text-right font-medium">
                     {type?.name ?? "—"}
                   </TableCell>
@@ -149,17 +160,6 @@ export function TzalamTable({
                       )}
                     </TableCell>
                   ))}
-                  <TableCell className="text-center">
-                    <div className="flex justify-center">
-                      <Checkbox
-                        checked={present}
-                        disabled={!editable}
-                        onCheckedChange={(c: boolean) =>
-                          onToggle(item, Boolean(c))
-                        }
-                      />
-                    </div>
-                  </TableCell>
                   <TableCell className="text-center">
                     <div className="flex justify-center gap-1">
                       <Button
