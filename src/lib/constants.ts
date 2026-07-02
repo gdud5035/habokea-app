@@ -4,7 +4,7 @@
 export const APP_NAME = "גדוד הבוקע - 5035";
 
 // ---- Tabs / permissions ----
-export const TAB_KEYS = ["vehicles", "drones", "hamal", "drive_card", "whatsapp", "admin", "profile"] as const;
+export const TAB_KEYS = ["vehicles", "drones", "hamal", "drive_card", "tzalam", "whatsapp", "admin", "profile"] as const;
 export type TabKey = (typeof TAB_KEYS)[number];
 
 export const TAB_LABELS: Record<TabKey, string> = {
@@ -12,6 +12,7 @@ export const TAB_LABELS: Record<TabKey, string> = {
   drones: "רחפנים",
   hamal: "שבצק חמל",
   drive_card: "כרטיס עבודה",
+  tzalam: "צלם",
   whatsapp: "הודעות וואטסאפ",
   admin: "ניהול",
   profile: "פרופיל",
@@ -22,6 +23,7 @@ export const TAB_ROUTES: Record<TabKey, string> = {
   drones: "/drones",
   hamal: "/hamal",
   drive_card: "/drive-card",
+  tzalam: "/tzalam",
   whatsapp: "/whatsapp",
   admin: "/admin",
   profile: "/profile",
@@ -29,6 +31,28 @@ export const TAB_ROUTES: Record<TabKey, string> = {
 
 // Profile is always accessible to any authenticated user.
 export const ALWAYS_ALLOWED_TABS: TabKey[] = ["profile"];
+
+// ---- "צלם" companies (a distinct list from the vehicle companies) ----
+export const TZALAM_COMPANIES = ["A", "B", "C", "Mesayat", "Palsam", "Bunker"] as const;
+export type TzalamCompany = (typeof TZALAM_COMPANIES)[number];
+
+export const TZALAM_COMPANY_HE: Record<TzalamCompany, string> = {
+  A: "פלוגה א",
+  B: "פלוגה ב",
+  C: "פלוגה ג",
+  Mesayat: "פלוגה מסייעת",
+  Palsam: 'פלס"מ',
+  Bunker: "בונקר",
+};
+
+export const TZALAM_COMPANY_ORDER: Record<TzalamCompany, number> = {
+  A: 1,
+  B: 2,
+  C: 3,
+  Mesayat: 4,
+  Palsam: 5,
+  Bunker: 6,
+};
 
 // ---- Color palette for סמבצים (שבצק חמל) ----
 export const HAMAL_COLORS: string[] = [

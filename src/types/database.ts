@@ -172,6 +172,89 @@ export type HamalDayTextInsert = Omit<
 };
 export type HamalDayTextUpdate = Partial<HamalDayTextInsert>;
 
+// ---- "צלם" feature ----
+export type TzalamGroupRow = {
+  id: string;
+  name: string;
+  position: number;
+  created_at: string;
+};
+export type TzalamGroupInsert = { name: string } & Partial<TzalamGroupRow>;
+export type TzalamGroupUpdate = Partial<TzalamGroupInsert>;
+
+export type TzalamEquipmentTypeRow = {
+  id: string;
+  name: string;
+  group_id: string | null;
+  position: number;
+  created_at: string;
+};
+export type TzalamEquipmentTypeInsert = { name: string } & Partial<TzalamEquipmentTypeRow>;
+export type TzalamEquipmentTypeUpdate = Partial<TzalamEquipmentTypeInsert>;
+
+export type TzalamColumnRow = {
+  id: string;
+  label: string;
+  field_type: string; // 'text' | 'number'
+  position: number;
+  created_at: string;
+};
+export type TzalamColumnInsert = { label: string } & Partial<TzalamColumnRow>;
+export type TzalamColumnUpdate = Partial<TzalamColumnInsert>;
+
+export type TzalamItemRow = {
+  id: string;
+  company: string;
+  equipment_type_id: string | null;
+  attributes: Json; // { [columnId]: string | number }
+  position: number;
+  created_at: string;
+  updated_at: string;
+};
+export type TzalamItemInsert = { company: string } & Partial<TzalamItemRow>;
+export type TzalamItemUpdate = Partial<TzalamItemInsert>;
+
+export type TzalamDailyMarkRow = {
+  id: string;
+  item_id: string;
+  mark_date: string;
+  present: boolean;
+  marked_by: string | null;
+  marked_at: string;
+};
+export type TzalamDailyMarkInsert = {
+  item_id: string;
+  mark_date: string;
+} & Partial<TzalamDailyMarkRow>;
+export type TzalamDailyMarkUpdate = Partial<TzalamDailyMarkInsert>;
+
+export type TzalamDailyLockRow = {
+  id: string;
+  company: string;
+  lock_date: string;
+  locked_by: string | null;
+  locked_at: string;
+};
+export type TzalamDailyLockInsert = {
+  company: string;
+  lock_date: string;
+} & Partial<TzalamDailyLockRow>;
+export type TzalamDailyLockUpdate = Partial<TzalamDailyLockInsert>;
+
+export type TzalamUserCompanyRow = {
+  id: string;
+  user_id: string;
+  company: string;
+  can_view: boolean;
+  can_edit: boolean;
+  created_at: string;
+};
+export type TzalamUserCompanyInsert = {
+  user_id: string;
+  company: string;
+} & Partial<TzalamUserCompanyRow>;
+export type TzalamUserCompanyUpdate = Partial<TzalamUserCompanyInsert>;
+
 type Table<R, I = Partial<R>, U = Partial<R>> = {
   Row: R;
   Insert: I;
@@ -206,6 +289,37 @@ export type Database = {
         HamalDayTextRow,
         HamalDayTextInsert,
         HamalDayTextUpdate
+      >;
+      tzalam_groups: Table<
+        TzalamGroupRow,
+        TzalamGroupInsert,
+        TzalamGroupUpdate
+      >;
+      tzalam_equipment_types: Table<
+        TzalamEquipmentTypeRow,
+        TzalamEquipmentTypeInsert,
+        TzalamEquipmentTypeUpdate
+      >;
+      tzalam_columns: Table<
+        TzalamColumnRow,
+        TzalamColumnInsert,
+        TzalamColumnUpdate
+      >;
+      tzalam_items: Table<TzalamItemRow, TzalamItemInsert, TzalamItemUpdate>;
+      tzalam_daily_marks: Table<
+        TzalamDailyMarkRow,
+        TzalamDailyMarkInsert,
+        TzalamDailyMarkUpdate
+      >;
+      tzalam_daily_locks: Table<
+        TzalamDailyLockRow,
+        TzalamDailyLockInsert,
+        TzalamDailyLockUpdate
+      >;
+      tzalam_user_companies: Table<
+        TzalamUserCompanyRow,
+        TzalamUserCompanyInsert,
+        TzalamUserCompanyUpdate
       >;
     };
     Views: Record<string, never>;

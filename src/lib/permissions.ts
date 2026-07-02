@@ -2,7 +2,9 @@ import { createClient } from "@/lib/supabase/server";
 import {
   ALWAYS_ALLOWED_TABS,
   TAB_KEYS,
+  TZALAM_COMPANIES,
   type TabKey,
+  type TzalamCompany,
 } from "@/lib/constants";
 
 export type ProfileWithRole = {
@@ -76,6 +78,53 @@ export async function getEffectivePermissions(
   // Profile is never removable.
   ALWAYS_ALLOWED_TABS.forEach((t) => allowed.add(t));
   return allowed;
+}
+
+export type TzalamCompanyAccess = {
+  company: TzalamCompany;
+  view: boolean;
+  edit: boolean;
+};
+
+// Resolve which "צלם" companies a user may view / edit.
+// Admins get view+edit on every company; others are read from tzalam_user_companies.
+export async function getTzalamCompanyAccess(
+  userId: string,
+): Promise<TzalamCompanyAccess[]> {
+  const supabase = await createClient();
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role_id")
+    .eq("id", userId)
+    .maybeSingle();
+
+  const roleId = (profile as { role_id: string | null } | null)?.role_id ?? null;
+  if ((await roleName(roleId)) === "admin") {
+    return TZALAM_COMPANIES.map((company) => ({
+      company,
+      view: true,
+      edit: true,
+    }));
+  }
+
+  const { data } = await supabase
+    .from("tzalam_user_companies")
+    .select("company, can_view, can_edit")
+    .eq("user_id", userId);
+
+  const rows =
+    (data as { company: string; can_view: boolean; can_edit: boolean }[] | null) ??
+    [];
+
+  return rows
+    .filter((r) => (TZALAM_COMPANIES as readonly string[]).includes(r.company))
+    .filter((r) => r.can_view)
+    .map((r) => ({
+      company: r.company as TzalamCompany,
+      view: r.can_view,
+      edit: r.can_edit,
+    }));
 }
 
 // Current user's profile (with role name + is_admin convenience flag).
