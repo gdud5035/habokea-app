@@ -74,8 +74,13 @@ function ItemForm({
     const attrs = (item?.attributes ?? {}) as Record<string, unknown>;
     const init: Record<string, string> = {};
     for (const c of columns) {
-      const v = attrs[c.id];
-      init[c.id] = v == null ? "" : String(v);
+      if (item) {
+        const v = attrs[c.id];
+        init[c.id] = v == null ? "" : String(v);
+      } else {
+        // New item: pre-fill from the column's configured default value.
+        init[c.id] = c.default_value ?? "";
+      }
     }
     return init;
   });

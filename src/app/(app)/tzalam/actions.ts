@@ -141,6 +141,7 @@ export async function deleteTypeAction(id: string): Promise<ActionResult> {
 export async function createColumnAction(
   label: string,
   fieldType: "text" | "number",
+  defaultValue?: string | null,
 ): Promise<ActionResult> {
   return wrap(async () => {
     await assertAdmin();
@@ -154,9 +155,15 @@ export async function createColumnAction(
       .limit(1)
       .maybeSingle();
     const nextPos = ((maxRow as { position: number } | null)?.position ?? -1) + 1;
+    const dv = defaultValue?.trim() ? defaultValue.trim() : null;
     const { error } = await admin
       .from("tzalam_columns")
-      .insert({ label: trimmed, field_type: fieldType, position: nextPos });
+      .insert({
+        label: trimmed,
+        field_type: fieldType,
+        default_value: dv,
+        position: nextPos,
+      });
     if (error) return { ok: false, error: error.message };
     revalidatePath("/tzalam");
     return { ok: true };
@@ -165,17 +172,29 @@ export async function createColumnAction(
 
 export async function updateColumnAction(
   id: string,
-  updates: { label?: string; field_type?: "text" | "number" },
+  updates: {
+    label?: string;
+    field_type?: "text" | "number";
+    default_value?: string | null;
+  },
 ): Promise<ActionResult> {
   return wrap(async () => {
     await assertAdmin();
-    const patch: { label?: string; field_type?: string } = {};
+    const patch: {
+      label?: string;
+      field_type?: string;
+      default_value?: string | null;
+    } = {};
     if (updates.label !== undefined) {
       const trimmed = updates.label.trim();
       if (!trimmed) return { ok: false, error: "שם העמודה הוא שדה חובה" };
       patch.label = trimmed;
     }
     if (updates.field_type !== undefined) patch.field_type = updates.field_type;
+    if (updates.default_value !== undefined) {
+      const dv = updates.default_value?.trim();
+      patch.default_value = dv ? dv : null;
+    }
     const admin = createAdminClient();
     const { error } = await admin.from("tzalam_columns").update(patch).eq("id", id);
     if (error) return { ok: false, error: error.message };

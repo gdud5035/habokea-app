@@ -148,6 +148,7 @@ function ColumnsSection({
 }) {
   const [newLabel, setNewLabel] = useState("");
   const [newType, setNewType] = useState<FieldType>("text");
+  const [newDefault, setNewDefault] = useState("");
 
   const sorted = [...columns].sort(byPosition);
 
@@ -155,6 +156,18 @@ function ColumnsSection({
     const trimmed = label.trim();
     if (!trimmed || trimmed === original) return;
     const res = await updateColumnAction(id, { label: trimmed });
+    if (!res.ok) {
+      toast.error(res.error);
+      return;
+    }
+    toast.success("נשמר");
+    onChanged();
+  }
+
+  async function saveDefault(id: string, value: string, original: string | null) {
+    const next = value.trim();
+    if (next === (original ?? "")) return;
+    const res = await updateColumnAction(id, { default_value: next || null });
     if (!res.ok) {
       toast.error(res.error);
       return;
@@ -180,7 +193,7 @@ function ColumnsSection({
       toast.error("יש להזין שם עמודה");
       return;
     }
-    const res = await createColumnAction(label, newType);
+    const res = await createColumnAction(label, newType, newDefault || null);
     if (!res.ok) {
       toast.error(res.error);
       return;
@@ -188,6 +201,7 @@ function ColumnsSection({
     toast.success("נוסף");
     setNewLabel("");
     setNewType("text");
+    setNewDefault("");
     onChanged();
   }
 
@@ -200,24 +214,37 @@ function ColumnsSection({
         {sorted.map((c) => (
           <div
             key={c.id}
-            className="flex items-center gap-2 rounded-lg border border-input p-2"
+            className="flex flex-col gap-2 rounded-lg border border-input p-2"
           >
-            <InlineEdit
-              value={c.label}
-              onSave={(v) => saveLabel(c.id, v, c.label)}
-            />
-            <span className="shrink-0 rounded-md bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-              {fieldTypeHe(c.field_type)}
-            </span>
-            <Button
-              type="button"
-              size="icon-sm"
-              variant="destructive"
-              onClick={() => remove(c.id)}
-              aria-label="מחק עמודה"
-            >
-              <Trash2 />
-            </Button>
+            <div className="flex items-center gap-2">
+              <InlineEdit
+                value={c.label}
+                onSave={(v) => saveLabel(c.id, v, c.label)}
+              />
+              <span className="shrink-0 rounded-md bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                {fieldTypeHe(c.field_type)}
+              </span>
+              <Button
+                type="button"
+                size="icon-sm"
+                variant="destructive"
+                onClick={() => remove(c.id)}
+                aria-label="מחק עמודה"
+              >
+                <Trash2 />
+              </Button>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="shrink-0 text-xs text-muted-foreground">
+                ברירת מחדל
+              </span>
+              <DefaultValueField
+                key={`${c.id}-${c.default_value ?? ""}`}
+                initial={c.default_value ?? ""}
+                fieldType={c.field_type}
+                onSave={(v) => saveDefault(c.id, v, c.default_value)}
+              />
+            </div>
           </div>
         ))}
       </div>
@@ -247,12 +274,55 @@ function ColumnsSection({
             </SelectContent>
           </Select>
         </div>
+        <div className="flex flex-col gap-1.5">
+          <Label>ברירת מחדל (רשות)</Label>
+          <Input
+            type={newType === "number" ? "number" : "text"}
+            value={newDefault}
+            onChange={(e) => setNewDefault(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && add()}
+            placeholder="ללא"
+          />
+        </div>
         <Button type="button" onClick={add}>
           <Plus />
           הוסף עמודה
         </Button>
       </div>
     </div>
+  );
+}
+
+function DefaultValueField({
+  initial,
+  fieldType,
+  onSave,
+}: {
+  initial: string;
+  fieldType: string;
+  onSave: (value: string) => void | Promise<void>;
+}) {
+  const [buffer, setBuffer] = useState(initial);
+
+  function commit() {
+    if (buffer.trim() !== initial) void onSave(buffer);
+  }
+
+  return (
+    <Input
+      type={fieldType === "number" ? "number" : "text"}
+      value={buffer}
+      onChange={(e) => setBuffer(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          commit();
+        }
+      }}
+      placeholder="ללא ברירת מחדל"
+      className="h-8"
+    />
   );
 }
 

@@ -9,10 +9,11 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Settings, Lock, CheckCircle2 } from "lucide-react";
+import { Settings, Lock, CheckCircle2, BarChart3, ArrowUpDown } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import {
   TZALAM_COMPANY_HE,
+  TZALAM_COMPANY_ORDER,
   type TzalamCompany,
 } from "@/lib/constants";
 import type { TzalamCompanyAccess } from "@/lib/permissions";
@@ -37,6 +38,10 @@ import { TableSkeleton } from "@/components/loading-skeletons";
 import { TzalamTable } from "@/components/tzalam/tzalam-table";
 import { TzalamItemModal } from "@/components/tzalam/tzalam-item-modal";
 import { TzalamSettingsDialog } from "@/components/tzalam/tzalam-settings-dialog";
+import {
+  TzalamCompanyStatusDialog,
+  type CompanyStatus,
+} from "@/components/tzalam/tzalam-company-status-dialog";
 import { unlockTzalamDayAction } from "./actions";
 
 export interface TzalamClientProps {
@@ -152,6 +157,19 @@ function TzalamInner({ isAdmin, access, currentUserId }: TzalamClientProps) {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<TzalamItemRow | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [statusOpen, setStatusOpen] = useState(false);
+
+  // ---- Search / filter / sort ----
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterType, setFilterType] = useState("");
+  const [filterGroup, setFilterGroup] = useState("");
+  const [filterPresent, setFilterPresent] = useState<"" | "present" | "absent">(
+    "",
+  );
+  const [sortField, setSortField] = useState<"" | "type" | "group" | "present">(
+    "",
+  );
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
   const isToday = selectedDate === today;
 
@@ -180,6 +198,16 @@ function TzalamInner({ isAdmin, access, currentUserId }: TzalamClientProps) {
     queryKey: ["tzalam_locks", selectedDate],
     queryFn: () => fetchLocks(selectedDate),
   });
+  // Company status (dropdown coloring + admin status table) is always about today.
+  // react-query dedups these with the selected-date queries when the date is today.
+  const todayMarksQuery = useQuery({
+    queryKey: ["tzalam_marks", today],
+    queryFn: () => fetchMarks(today),
+  });
+  const todayLocksQuery = useQuery({
+    queryKey: ["tzalam_locks", today],
+    queryFn: () => fetchLocks(today),
+  });
 
   const columns = useMemo(() => columnsQuery.data ?? [], [columnsQuery.data]);
   const groups = useMemo(() => groupsQuery.data ?? [], [groupsQuery.data]);
@@ -198,13 +226,100 @@ function TzalamInner({ isAdmin, access, currentUserId }: TzalamClientProps) {
     return m;
   }, [locksQuery.data]);
 
-  // ---- Visible items (company filter) ----
+  const typeById = useMemo(() => {
+    const m = new Map<string, (typeof types)[number]>();
+    for (const t of types) m.set(t.id, t);
+    return m;
+  }, [types]);
+
+  // ---- Visible items (company filter via the top dropdown) ----
   const visibleItems = useMemo(() => {
     if (selectedCompany === ALL) return items;
     return items.filter((i) => i.company === selectedCompany);
   }, [items, selectedCompany]);
 
   const showCompanyColumn = selectedCompany === ALL;
+
+  // ---- Search + filters applied to the visible set (does not affect progress) ----
+  const displayItems = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    return visibleItems.filter((item) => {
+      const type = item.equipment_type_id
+        ? typeById.get(item.equipment_type_id)
+        : null;
+      if (filterType && item.equipment_type_id !== filterType) return false;
+      if (filterGroup && (type?.group_id ?? "") !== filterGroup) return false;
+      if (filterPresent === "present" && !marksMap[item.id]) return false;
+      if (filterPresent === "absent" && marksMap[item.id]) return false;
+      if (term) {
+        const hay = [
+          type?.name ?? "",
+          ...Object.values(
+            (item.attributes ?? {}) as Record<string, unknown>,
+          ).map((v) => (v == null ? "" : String(v))),
+        ]
+          .join(" ")
+          .toLowerCase();
+        if (!hay.includes(term)) return false;
+      }
+      return true;
+    });
+  }, [
+    visibleItems,
+    typeById,
+    filterType,
+    filterGroup,
+    filterPresent,
+    marksMap,
+    searchTerm,
+  ]);
+
+  // ---- Per-company status for TODAY (dropdown coloring + admin status table) ----
+  const todayMarksMap = useMemo(() => {
+    const m: Record<string, boolean> = {};
+    for (const row of todayMarksQuery.data ?? []) m[row.item_id] = row.present;
+    return m;
+  }, [todayMarksQuery.data]);
+
+  const todayLockedSet = useMemo(() => {
+    const s = new Set<string>();
+    for (const row of todayLocksQuery.data ?? []) s.add(row.company);
+    return s;
+  }, [todayLocksQuery.data]);
+
+  const companyTodayStatus = useMemo(() => {
+    const m = new Map<string, CompanyStatus>();
+    for (const company of viewCompanies) {
+      const list = items.filter((i) => i.company === company);
+      const total = list.length;
+      const present = list.filter((i) => todayMarksMap[i.id]).length;
+      const p = total > 0 ? Math.round((present / total) * 100) : 0;
+      m.set(company, {
+        total,
+        present,
+        pct: p,
+        locked: todayLockedSet.has(company),
+      });
+    }
+    return m;
+  }, [items, viewCompanies, todayMarksMap, todayLockedSet]);
+
+  const statusCompanies = useMemo(
+    () =>
+      [...viewCompanies].sort(
+        (a, b) => TZALAM_COMPANY_ORDER[a] - TZALAM_COMPANY_ORDER[b],
+      ),
+    [viewCompanies],
+  );
+
+  const resetFilters = () => {
+    setSearchTerm("");
+    setFilterType("");
+    setFilterGroup("");
+    setFilterPresent("");
+    setSortField("");
+    setSortDir("asc");
+  };
 
   const rowEditable = (company: string) =>
     isToday && !locksMap[company] && canEditCompany(company);
@@ -433,11 +548,21 @@ function TzalamInner({ isAdmin, access, currentUserId }: TzalamClientProps) {
               <SelectValue placeholder="פלוגה" />
             </SelectTrigger>
             <SelectContent>
-              {companyFilterOptions.map((o) => (
-                <SelectItem key={o.value} value={o.value}>
-                  {o.label}
-                </SelectItem>
-              ))}
+              {companyFilterOptions.map((o) => {
+                const st =
+                  o.value !== ALL ? companyTodayStatus.get(o.value) : undefined;
+                const showPct = !!st && st.total > 0 && st.pct < 100;
+                return (
+                  <SelectItem
+                    key={o.value}
+                    value={o.value}
+                    className={st?.locked ? "text-green-600" : undefined}
+                  >
+                    {o.label}
+                    {showPct ? ` (${st!.pct}%)` : ""}
+                  </SelectItem>
+                );
+              })}
             </SelectContent>
           </Select>
 
@@ -463,6 +588,16 @@ function TzalamInner({ isAdmin, access, currentUserId }: TzalamClientProps) {
           {isAdmin && (
             <Button
               variant="outline"
+              onClick={() => setStatusOpen(true)}
+              className="gap-1.5"
+            >
+              <BarChart3 className="size-4" />
+              סטטוס פלוגות
+            </Button>
+          )}
+          {isAdmin && (
+            <Button
+              variant="outline"
               size="icon"
               onClick={() => setSettingsOpen(true)}
               aria-label="הגדרות"
@@ -471,6 +606,98 @@ function TzalamInner({ isAdmin, access, currentUserId }: TzalamClientProps) {
             </Button>
           )}
         </div>
+      </div>
+
+      {/* Search / filters / sort */}
+      <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-card p-2">
+        <Input
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          placeholder="חיפוש..."
+          className="w-48"
+        />
+        {types.length > 0 && (
+          <Select
+            value={filterType || "__all__"}
+            onValueChange={(v) => setFilterType(v === "__all__" ? "" : v)}
+          >
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="סוג אמצעי" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">כל הסוגים</SelectItem>
+              {types.map((t) => (
+                <SelectItem key={t.id} value={t.id}>
+                  {t.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+        {groups.length > 0 && (
+          <Select
+            value={filterGroup || "__all__"}
+            onValueChange={(v) => setFilterGroup(v === "__all__" ? "" : v)}
+          >
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="קבוצה" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">כל הקבוצות</SelectItem>
+              {groups.map((g) => (
+                <SelectItem key={g.id} value={g.id}>
+                  {g.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+        <Select
+          value={filterPresent || "__all__"}
+          onValueChange={(v) =>
+            setFilterPresent(v === "__all__" ? "" : (v as "present" | "absent"))
+          }
+        >
+          <SelectTrigger className="w-36">
+            <SelectValue placeholder="נמצא/לא נמצא" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">הכל</SelectItem>
+            <SelectItem value="present">נמצא</SelectItem>
+            <SelectItem value="absent">לא נמצא</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select
+          value={sortField || "__none__"}
+          onValueChange={(v) =>
+            setSortField(
+              v === "__none__" ? "" : (v as "type" | "group" | "present"),
+            )
+          }
+        >
+          <SelectTrigger className="w-40">
+            <SelectValue placeholder="מיון" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__none__">מיון: ברירת מחדל</SelectItem>
+            <SelectItem value="type">סוג אמצעי</SelectItem>
+            <SelectItem value="group">קבוצה</SelectItem>
+            <SelectItem value="present">נמצא</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button
+          variant="outline"
+          size="icon"
+          disabled={!sortField}
+          onClick={() => setSortDir((d) => (d === "asc" ? "desc" : "asc"))}
+          aria-label="כיוון מיון"
+          title={sortDir === "asc" ? "עולה" : "יורד"}
+        >
+          <ArrowUpDown className="size-4" />
+        </Button>
+        <Button variant="outline" onClick={resetFilters}>
+          נקה סינון
+        </Button>
       </div>
 
       {/* Progress + finish-day row */}
@@ -522,7 +749,7 @@ function TzalamInner({ isAdmin, access, currentUserId }: TzalamClientProps) {
         <TableSkeleton />
       ) : (
         <TzalamTable
-          items={visibleItems}
+          items={displayItems}
           columns={columns}
           types={types}
           groups={groups}
@@ -530,6 +757,8 @@ function TzalamInner({ isAdmin, access, currentUserId }: TzalamClientProps) {
           companyHe={companyHe}
           showCompany={showCompanyColumn}
           rowEditable={rowEditable}
+          sortField={sortField}
+          sortDir={sortDir}
           onToggle={handleToggle}
           onEdit={openEdit}
           onDelete={handleDelete}
@@ -568,6 +797,16 @@ function TzalamInner({ isAdmin, access, currentUserId }: TzalamClientProps) {
             queryClient.invalidateQueries({ queryKey: ["tzalam_groups"] });
             queryClient.invalidateQueries({ queryKey: ["tzalam_types"] });
           }}
+        />
+      )}
+
+      {isAdmin && (
+        <TzalamCompanyStatusDialog
+          open={statusOpen}
+          onClose={() => setStatusOpen(false)}
+          companies={statusCompanies}
+          status={companyTodayStatus}
+          companyHe={companyHe}
         />
       )}
     </div>

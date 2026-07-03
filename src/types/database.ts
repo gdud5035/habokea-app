@@ -196,6 +196,7 @@ export type TzalamColumnRow = {
   id: string;
   label: string;
   field_type: string; // 'text' | 'number'
+  default_value: string | null;
   position: number;
   created_at: string;
 };
