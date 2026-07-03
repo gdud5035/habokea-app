@@ -80,6 +80,73 @@ export async function createUserAction(input: {
   }
 }
 
+export async function updateUserAction(
+  userId: string,
+  input: { full_name: string; email: string; phone: string }
+): Promise<ActionResult> {
+  try {
+    await assertAdmin();
+
+    const full_name = input.full_name.trim();
+    const email = input.email.trim().toLowerCase();
+    const phone = input.phone.trim();
+
+    if (!full_name) return { ok: false, error: "שם מלא הוא שדה חובה" };
+    if (!email) return { ok: false, error: "אימייל הוא שדה חובה" };
+    if (!phone) return { ok: false, error: "טלפון הוא שדה חובה" };
+
+    const admin = createAdminClient();
+
+    // Keep the auth record in sync (email + metadata) so login stays consistent.
+    const { error: authErr } = await admin.auth.admin.updateUserById(userId, {
+      email,
+      user_metadata: { full_name, phone },
+    });
+    if (authErr) {
+      if (/already|exist|registered|duplicate/i.test(authErr.message)) {
+        return { ok: false, error: "משתמש עם אימייל זה כבר קיים" };
+      }
+      return { ok: false, error: authErr.message || "עדכון המשתמש נכשל" };
+    }
+
+    const { error: profileErr } = await admin
+      .from("profiles")
+      .update({ full_name, email, phone })
+      .eq("id", userId);
+
+    if (profileErr) {
+      if (/duplicate|unique/i.test(profileErr.message)) {
+        return { ok: false, error: "מספר טלפון זה כבר קיים במערכת" };
+      }
+      return { ok: false, error: profileErr.message || "שמירת הפרופיל נכשלה" };
+    }
+
+    revalidatePath("/admin");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "שגיאה לא צפויה" };
+  }
+}
+
+export async function deleteUserAction(userId: string): Promise<ActionResult> {
+  try {
+    const me = await assertAdmin();
+    if (me.id === userId) {
+      return { ok: false, error: "לא ניתן למחוק את המשתמש שלך" };
+    }
+
+    const admin = createAdminClient();
+    // Deleting the auth user cascades to the profile row and its dependents.
+    const { error } = await admin.auth.admin.deleteUser(userId);
+    if (error) return { ok: false, error: error.message || "מחיקת המשתמש נכשלה" };
+
+    revalidatePath("/admin");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "שגיאה לא צפויה" };
+  }
+}
+
 export async function setUserRoleAction(
   userId: string,
   roleId: string | null

@@ -34,9 +34,12 @@ import { TAB_KEYS, TAB_LABELS, ALWAYS_ALLOWED_TABS, type TabKey } from "@/lib/co
 import type { ProfileRow, RoleRow, UserTabOverrideRow } from "@/types/database";
 import {
   createUserAction,
+  updateUserAction,
+  deleteUserAction,
   setUserRoleAction,
   setUserOverrideAction,
 } from "@/app/(app)/admin/actions";
+import { Pencil, Trash2 } from "lucide-react";
 
 const NO_ROLE = "__none__";
 const ALWAYS = new Set<TabKey>(ALWAYS_ALLOWED_TABS);
@@ -144,6 +147,64 @@ export function UsersManager({
     });
   }
 
+  // --- edit user dialog ---
+  const [editUserId, setEditUserId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({
+    full_name: "",
+    email: "",
+    phone: "",
+  });
+
+  function openEdit(u: ProfileRow) {
+    setEditForm({
+      full_name: u.full_name ?? "",
+      email: u.email ?? "",
+      phone: u.phone ?? "",
+    });
+    setEditUserId(u.id);
+  }
+
+  function handleUpdate() {
+    if (!editUserId) return;
+    const id = editUserId;
+    startTransition(async () => {
+      const res = await updateUserAction(id, editForm);
+      if (res.ok) {
+        setUsers((u) =>
+          u.map((x) =>
+            x.id === id
+              ? {
+                  ...x,
+                  full_name: editForm.full_name.trim(),
+                  email: editForm.email.trim().toLowerCase(),
+                  phone: editForm.phone.trim(),
+                }
+              : x
+          )
+        );
+        toast.success("הפרטים עודכנו");
+        setEditUserId(null);
+      } else {
+        toast.error(res.error);
+      }
+    });
+  }
+
+  function handleDelete(u: ProfileRow) {
+    const name = u.full_name || u.email || "המשתמש";
+    if (!window.confirm(`למחוק את ${name}? פעולה זו אינה הפיכה.`)) return;
+    startTransition(async () => {
+      const res = await deleteUserAction(u.id);
+      if (res.ok) {
+        setUsers((list) => list.filter((x) => x.id !== u.id));
+        if (selectedUserId === u.id) setSelectedUserId(null);
+        toast.success("המשתמש נמחק");
+      } else {
+        toast.error(res.error);
+      }
+    });
+  }
+
   function currentOverride(userId: string, tab: TabKey): OverrideState {
     return overrides[userId]?.[tab] ?? "default";
   }
@@ -248,12 +309,13 @@ export function UsersManager({
                 <TableHead className="text-right">טלפון</TableHead>
                 <TableHead className="text-right">תפקיד</TableHead>
                 <TableHead className="text-right">הרשאות</TableHead>
+                <TableHead className="text-right">עריכה</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {users.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground">
+                  <TableCell colSpan={6} className="text-center text-muted-foreground">
                     אין משתמשים
                   </TableCell>
                 </TableRow>
@@ -296,12 +358,89 @@ export function UsersManager({
                       {selectedUserId === u.id ? "סגור" : "ערוך הרשאות"}
                     </Button>
                   </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1.5">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon-sm"
+                        onClick={() => openEdit(u)}
+                        aria-label="ערוך פרטים"
+                      >
+                        <Pencil />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="icon-sm"
+                        onClick={() => handleDelete(u)}
+                        disabled={pending}
+                        aria-label="מחק משתמש"
+                      >
+                        <Trash2 />
+                      </Button>
+                    </div>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
+
+      <Dialog
+        open={editUserId !== null}
+        onOpenChange={(o) => !o && setEditUserId(null)}
+      >
+        <DialogContent dir="rtl">
+          <DialogHeader>
+            <DialogTitle>עריכת פרטי משתמש</DialogTitle>
+            <DialogDescription>
+              עדכון השם, האימייל או מספר הטלפון של המשתמש.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="eu-name">שם מלא</Label>
+              <Input
+                id="eu-name"
+                value={editForm.full_name}
+                onChange={(e) =>
+                  setEditForm((f) => ({ ...f, full_name: e.target.value }))
+                }
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="eu-email">אימייל</Label>
+              <Input
+                id="eu-email"
+                type="email"
+                dir="ltr"
+                value={editForm.email}
+                onChange={(e) =>
+                  setEditForm((f) => ({ ...f, email: e.target.value }))
+                }
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="eu-phone">טלפון</Label>
+              <Input
+                id="eu-phone"
+                dir="ltr"
+                value={editForm.phone}
+                onChange={(e) =>
+                  setEditForm((f) => ({ ...f, phone: e.target.value }))
+                }
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" onClick={handleUpdate} disabled={pending}>
+              {pending ? "שומר..." : "שמור שינויים"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {selectedUser && (
         <Card>
