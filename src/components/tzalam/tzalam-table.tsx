@@ -18,6 +18,7 @@ import type {
   TzalamEquipmentTypeRow,
   TzalamGroupRow,
 } from "@/types/database";
+import { orderTzalamRows, tzalamAttrValue as attrValue } from "@/lib/tzalam-order";
 
 export interface TzalamTableProps {
   items: TzalamItemRow[];
@@ -35,13 +36,6 @@ export interface TzalamTableProps {
   onDelete: (item: TzalamItemRow) => void;
 }
 
-function attrValue(item: TzalamItemRow, columnId: string): string {
-  const attrs = (item.attributes ?? {}) as Record<string, unknown>;
-  const v = attrs[columnId];
-  if (v == null) return "";
-  return String(v);
-}
-
 export function TzalamTable({
   items,
   columns,
@@ -57,82 +51,21 @@ export function TzalamTable({
   onEdit,
   onDelete,
 }: TzalamTableProps) {
-  const typeById = new Map(types.map((t) => [t.id, t]));
-  const groupById = new Map(groups.map((g) => [g.id, g]));
-
-  const typeName = (item: TzalamItemRow): string =>
-    (item.equipment_type_id ? typeById.get(item.equipment_type_id)?.name : "") ??
-    "";
-  const groupName = (item: TzalamItemRow): string => {
-    const t = item.equipment_type_id ? typeById.get(item.equipment_type_id) : null;
-    return (t?.group_id ? groupById.get(t.group_id)?.name : "") ?? "";
-  };
-  // "שם" = the "חייל חתום" column value.
-  const signedColId = columns.find((c) => c.label === "חייל חתום")?.id ?? null;
-  const signedName = (item: TzalamItemRow): string =>
-    signedColId ? attrValue(item, signedColId) : "";
-
-  const sorted = [...items];
-  if (sortField) {
-    const dir = sortDir === "desc" ? -1 : 1;
-    sorted.sort((a, b) => {
-      let cmp = 0;
-      if (sortField === "type") cmp = typeName(a).localeCompare(typeName(b), "he");
-      else if (sortField === "group")
-        cmp = groupName(a).localeCompare(groupName(b), "he");
-      else if (sortField === "signed") {
-        // Push empty names to the end (asc) so named rows come first.
-        const sa = signedName(a);
-        const sb = signedName(b);
-        if (!sa && !sb) cmp = 0;
-        else if (!sa) cmp = 1 * (dir === -1 ? -1 : 1);
-        else if (!sb) cmp = -1 * (dir === -1 ? -1 : 1);
-        else cmp = sa.localeCompare(sb, "he");
-      } else if (sortField === "present")
-        cmp = Number(marks[a.id] ?? false) - Number(marks[b.id] ?? false);
-      return cmp * dir;
-    });
-  } else {
-    // Default: by group order, then equipment type order, then item position.
-    sorted.sort((a, b) => {
-      const ta = a.equipment_type_id ? typeById.get(a.equipment_type_id) : null;
-      const tb = b.equipment_type_id ? typeById.get(b.equipment_type_id) : null;
-      const ga = ta?.group_id ? groupById.get(ta.group_id) : null;
-      const gb = tb?.group_id ? groupById.get(tb.group_id) : null;
-      const gpa = ga?.position ?? 9999;
-      const gpb = gb?.position ?? 9999;
-      if (gpa !== gpb) return gpa - gpb;
-      const tpa = ta?.position ?? 9999;
-      const tpb = tb?.position ?? 9999;
-      if (tpa !== tpb) return tpa - tpb;
-      return a.position - b.position;
-    });
-  }
-
   const colCount = 1 + (showCompany ? 1 : 0) + columns.length + 2;
 
-  // Precompute each row + whether it starts a new group section (no render-time
-  // mutation). Group headers are suppressed while an explicit sort is active.
-  const rows = sorted.map((item, idx) => {
-    const type = item.equipment_type_id
-      ? typeById.get(item.equipment_type_id)
-      : null;
-    const group = type?.group_id ? groupById.get(type.group_id) : null;
-    const groupKey = group?.id ?? "__none__";
-    const prev = sorted[idx - 1];
-    const prevType = prev?.equipment_type_id
-      ? typeById.get(prev.equipment_type_id)
-      : null;
-    const prevGroup = prevType?.group_id
-      ? groupById.get(prevType.group_id)
-      : null;
-    const prevGroupKey = prevGroup?.id ?? "__none__";
-    const showGroupHeader =
-      !sortField && !!group && (idx === 0 || groupKey !== prevGroupKey);
-    return { item, type, group, showGroupHeader };
+  // Ordering + group-header placement is shared with the PDF export so the
+  // download matches the on-screen view exactly.
+  const rows = orderTzalamRows({
+    items,
+    columns,
+    types,
+    groups,
+    marks,
+    sortField,
+    sortDir,
   });
 
-  if (sorted.length === 0) {
+  if (rows.length === 0) {
     return (
       <div className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
         אין אמצעים להצגה

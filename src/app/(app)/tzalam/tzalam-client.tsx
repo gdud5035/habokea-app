@@ -9,7 +9,14 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Settings, Lock, CheckCircle2, BarChart3, ArrowUpDown } from "lucide-react";
+import {
+  Settings,
+  Lock,
+  CheckCircle2,
+  BarChart3,
+  ArrowUpDown,
+  Download,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import {
   TZALAM_COMPANY_HE,
@@ -36,6 +43,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { TableSkeleton } from "@/components/loading-skeletons";
 import { TzalamTable } from "@/components/tzalam/tzalam-table";
+import { buildTzalamExport } from "@/lib/tzalam-order";
 import { TzalamItemModal } from "@/components/tzalam/tzalam-item-modal";
 import { TzalamSettingsDialog } from "@/components/tzalam/tzalam-settings-dialog";
 import {
@@ -158,6 +166,7 @@ function TzalamInner({ isAdmin, access, currentUserId }: TzalamClientProps) {
   const [selectedItem, setSelectedItem] = useState<TzalamItemRow | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
+  const [pdfLoading, setPdfLoading] = useState(false);
 
   // ---- Search / filter / sort ----
   const [searchTerm, setSearchTerm] = useState("");
@@ -493,6 +502,47 @@ function TzalamInner({ isAdmin, access, currentUserId }: TzalamClientProps) {
     queryClient.invalidateQueries({ queryKey: ["tzalam_locks", selectedDate] });
   };
 
+  const handleDownloadPdf = async () => {
+    setPdfLoading(true);
+    try {
+      const [y, m, d] = selectedDate.split("-");
+      const dateHe = `${d}/${m}/${y}`;
+      const companyLabel =
+        selectedCompany === ALL ? "כל הפלוגות" : companyHe(selectedCompany);
+      const payload = buildTzalamExport({
+        items: displayItems,
+        columns,
+        types,
+        groups,
+        marks: marksMap,
+        sortField,
+        sortDir,
+        showCompany: showCompanyColumn,
+        companyHe,
+        title: `צלם — ${companyLabel} — ${dateHe}`,
+      });
+      const res = await fetch("/api/tzalam/pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error("pdf failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `צלם_${selectedDate}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error("הורדת ה-PDF נכשלה");
+    } finally {
+      setPdfLoading(false);
+    }
+  };
+
   // ---- Company options for the filter ----
   const companyFilterOptions = useMemo(() => {
     const opts: { value: string; label: string }[] = [];
@@ -585,6 +635,15 @@ function TzalamInner({ isAdmin, access, currentUserId }: TzalamClientProps) {
 
         <div className="flex flex-wrap items-center gap-2">
           {canAdd && <Button onClick={openAdd}>הוסף אמצעי</Button>}
+          <Button
+            variant="outline"
+            onClick={handleDownloadPdf}
+            disabled={pdfLoading || displayItems.length === 0}
+            className="gap-1.5"
+          >
+            <Download className="size-4" />
+            {pdfLoading ? "מוריד..." : "הורד כ-PDF"}
+          </Button>
           {isAdmin && (
             <Button
               variant="outline"
