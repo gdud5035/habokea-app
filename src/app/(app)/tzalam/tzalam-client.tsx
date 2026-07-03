@@ -166,9 +166,9 @@ function TzalamInner({ isAdmin, access, currentUserId }: TzalamClientProps) {
   const [filterPresent, setFilterPresent] = useState<"" | "present" | "absent">(
     "",
   );
-  const [sortField, setSortField] = useState<"" | "type" | "group" | "present">(
-    "",
-  );
+  const [sortField, setSortField] = useState<
+    "" | "type" | "group" | "present" | "signed"
+  >("");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
   const isToday = selectedDate === today;
@@ -671,7 +671,9 @@ function TzalamInner({ isAdmin, access, currentUserId }: TzalamClientProps) {
           value={sortField || "__none__"}
           onValueChange={(v) =>
             setSortField(
-              v === "__none__" ? "" : (v as "type" | "group" | "present"),
+              v === "__none__"
+                ? ""
+                : (v as "type" | "group" | "present" | "signed"),
             )
           }
         >
@@ -682,6 +684,7 @@ function TzalamInner({ isAdmin, access, currentUserId }: TzalamClientProps) {
             <SelectItem value="__none__">מיון: ברירת מחדל</SelectItem>
             <SelectItem value="type">סוג אמצעי</SelectItem>
             <SelectItem value="group">קבוצה</SelectItem>
+            <SelectItem value="signed">שם (א-ת)</SelectItem>
             <SelectItem value="present">נמצא</SelectItem>
           </SelectContent>
         </Select>

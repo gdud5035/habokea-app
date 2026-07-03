@@ -28,7 +28,7 @@ export interface TzalamTableProps {
   companyHe: (company: string) => string;
   showCompany: boolean;
   rowEditable: (company: string) => boolean;
-  sortField?: "" | "type" | "group" | "present";
+  sortField?: "" | "type" | "group" | "present" | "signed";
   sortDir?: "asc" | "desc";
   onToggle: (item: TzalamItemRow, present: boolean) => void;
   onEdit: (item: TzalamItemRow) => void;
@@ -67,6 +67,10 @@ export function TzalamTable({
     const t = item.equipment_type_id ? typeById.get(item.equipment_type_id) : null;
     return (t?.group_id ? groupById.get(t.group_id)?.name : "") ?? "";
   };
+  // "שם" = the "חייל חתום" column value.
+  const signedColId = columns.find((c) => c.label === "חייל חתום")?.id ?? null;
+  const signedName = (item: TzalamItemRow): string =>
+    signedColId ? attrValue(item, signedColId) : "";
 
   const sorted = [...items];
   if (sortField) {
@@ -76,7 +80,15 @@ export function TzalamTable({
       if (sortField === "type") cmp = typeName(a).localeCompare(typeName(b), "he");
       else if (sortField === "group")
         cmp = groupName(a).localeCompare(groupName(b), "he");
-      else if (sortField === "present")
+      else if (sortField === "signed") {
+        // Push empty names to the end (asc) so named rows come first.
+        const sa = signedName(a);
+        const sb = signedName(b);
+        if (!sa && !sb) cmp = 0;
+        else if (!sa) cmp = 1 * (dir === -1 ? -1 : 1);
+        else if (!sb) cmp = -1 * (dir === -1 ? -1 : 1);
+        else cmp = sa.localeCompare(sb, "he");
+      } else if (sortField === "present")
         cmp = Number(marks[a.id] ?? false) - Number(marks[b.id] ?? false);
       return cmp * dir;
     });
