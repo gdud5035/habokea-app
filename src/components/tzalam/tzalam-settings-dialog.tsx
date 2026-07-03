@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Pencil, Trash2, Plus, Check } from "lucide-react";
+import { Pencil, Trash2, Plus, Check, ChevronUp, ChevronDown } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -37,6 +37,7 @@ import {
   createColumnAction,
   updateColumnAction,
   deleteColumnAction,
+  reorderColumnsAction,
   getTzalamAdminDataAction,
   setUserCompanyAction,
 } from "@/app/(app)/tzalam/actions";
@@ -150,7 +151,30 @@ function ColumnsSection({
   const [newType, setNewType] = useState<FieldType>("text");
   const [newDefault, setNewDefault] = useState("");
 
-  const sorted = [...columns].sort(byPosition);
+  // Optimistic ordering so reordering feels instant. Reset whenever the columns
+  // prop changes (React "adjust state during render" pattern — no effect needed).
+  const [optimistic, setOptimistic] = useState<TzalamColumnRow[] | null>(null);
+  const [prevColumns, setPrevColumns] = useState(columns);
+  if (columns !== prevColumns) {
+    setPrevColumns(columns);
+    setOptimistic(null);
+  }
+  const sorted = optimistic ?? [...columns].sort(byPosition);
+
+  async function move(index: number, dir: -1 | 1) {
+    const target = index + dir;
+    if (target < 0 || target >= sorted.length) return;
+    const next = [...sorted];
+    [next[index], next[target]] = [next[target], next[index]];
+    setOptimistic(next);
+    const res = await reorderColumnsAction(next.map((c) => c.id));
+    if (!res.ok) {
+      toast.error(res.error);
+      setOptimistic(null);
+      return;
+    }
+    onChanged();
+  }
 
   async function saveLabel(id: string, label: string, original: string) {
     const trimmed = label.trim();
@@ -211,12 +235,36 @@ function ColumnsSection({
         {sorted.length === 0 && (
           <p className="text-sm text-muted-foreground">אין עמודות עדיין.</p>
         )}
-        {sorted.map((c) => (
+        {sorted.map((c, index) => (
           <div
             key={c.id}
             className="flex flex-col gap-2 rounded-lg border border-input p-2"
           >
             <div className="flex items-center gap-2">
+              <div className="flex shrink-0 flex-col">
+                <Button
+                  type="button"
+                  size="icon-sm"
+                  variant="ghost"
+                  className="h-5"
+                  disabled={index === 0}
+                  onClick={() => move(index, -1)}
+                  aria-label="הזז למעלה"
+                >
+                  <ChevronUp />
+                </Button>
+                <Button
+                  type="button"
+                  size="icon-sm"
+                  variant="ghost"
+                  className="h-5"
+                  disabled={index === sorted.length - 1}
+                  onClick={() => move(index, 1)}
+                  aria-label="הזז למטה"
+                >
+                  <ChevronDown />
+                </Button>
+              </div>
               <InlineEdit
                 value={c.label}
                 onSave={(v) => saveLabel(c.id, v, c.label)}
@@ -583,6 +631,7 @@ type AdminData = { users: ProfileRow[]; userCompanies: TzalamUserCompanyRow[] };
 
 function AccessSection() {
   const queryClient = useQueryClient();
+  const [search, setSearch] = useState("");
   const { data, isLoading } = useQuery<AdminData>({
     queryKey: ADMIN_DATA_KEY,
     queryFn: async () => {
@@ -652,12 +701,31 @@ function AccessSection() {
   }
 
   if (users.length === 0) {
-    return <p className="text-sm text-muted-foreground">אין משתמשים.</p>;
+    return (
+      <p className="text-sm text-muted-foreground">
+        אין משתמשים עם הרשאה למסך הצלם.
+      </p>
+    );
   }
+
+  const term = search.trim().toLowerCase();
+  const filteredUsers = term
+    ? users.filter((u) =>
+        (u.full_name || u.email || "").toLowerCase().includes(term),
+      )
+    : users;
 
   return (
     <div className="flex flex-col gap-4">
-      {users.map((u) => (
+      <Input
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="חיפוש לפי שם..."
+      />
+      {filteredUsers.length === 0 && (
+        <p className="text-sm text-muted-foreground">לא נמצאו משתמשים.</p>
+      )}
+      {filteredUsers.map((u) => (
         <div
           key={u.id}
           className="flex flex-col gap-2 rounded-lg border border-input p-3"

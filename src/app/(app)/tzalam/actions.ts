@@ -203,6 +203,26 @@ export async function updateColumnAction(
   });
 }
 
+export async function reorderColumnsAction(
+  orderedIds: string[],
+): Promise<ActionResult> {
+  return wrap(async () => {
+    await assertAdmin();
+    if (orderedIds.length === 0) return { ok: true };
+    const admin = createAdminClient();
+    // Persist the new order by rewriting each column's position to its index.
+    const results = await Promise.all(
+      orderedIds.map((id, index) =>
+        admin.from("tzalam_columns").update({ position: index }).eq("id", id),
+      ),
+    );
+    const failed = results.find((r) => r.error);
+    if (failed?.error) return { ok: false, error: failed.error.message };
+    revalidatePath("/tzalam");
+    return { ok: true };
+  });
+}
+
 export async function deleteColumnAction(id: string): Promise<ActionResult> {
   return wrap(async () => {
     await assertAdmin();
@@ -224,14 +244,59 @@ export async function getTzalamAdminDataAction(): Promise<
   return wrap(async () => {
     await assertAdmin();
     const admin = createAdminClient();
-    const [{ data: usersData }, { data: ucData }] = await Promise.all([
+    const [
+      { data: usersData },
+      { data: ucData },
+      { data: rolesData },
+      { data: roleAccessData },
+      { data: overridesData },
+    ] = await Promise.all([
       admin.from("profiles").select("*").order("full_name"),
       admin.from("tzalam_user_companies").select("*"),
+      admin.from("roles").select("id, name"),
+      admin
+        .from("role_tab_access")
+        .select("role_id, can_access")
+        .eq("tab_key", "tzalam"),
+      admin
+        .from("user_tab_overrides")
+        .select("user_id, can_access")
+        .eq("tab_key", "tzalam"),
     ]);
+
+    const allUsers = (usersData as ProfileRow[] | null) ?? [];
+    const roles = (rolesData as { id: string; name: string }[] | null) ?? [];
+    const adminRoleIds = new Set(
+      roles.filter((r) => r.name === "admin").map((r) => r.id),
+    );
+    const roleGrants = new Map<string, boolean>();
+    for (const r of (roleAccessData as
+      | { role_id: string; can_access: boolean }[]
+      | null) ?? []) {
+      roleGrants.set(r.role_id, r.can_access);
+    }
+    const userOverrides = new Map<string, boolean | null>();
+    for (const o of (overridesData as
+      | { user_id: string; can_access: boolean | null }[]
+      | null) ?? []) {
+      userOverrides.set(o.user_id, o.can_access);
+    }
+
+    // A user may access the "צלם" screen when: they hold the admin role, their
+    // role grants the tzalam tab, or a per-user override grants it (an override
+    // wins over the role default). "tzalam" is not an always-allowed tab, so the
+    // default is no access.
+    const canAccessTzalam = (u: ProfileRow): boolean => {
+      if (u.role_id && adminRoleIds.has(u.role_id)) return true;
+      const override = userOverrides.get(u.id);
+      if (override !== undefined && override !== null) return override;
+      return u.role_id ? roleGrants.get(u.role_id) ?? false : false;
+    };
+
     return {
       ok: true,
       data: {
-        users: (usersData as ProfileRow[] | null) ?? [],
+        users: allUsers.filter(canAccessTzalam),
         userCompanies: (ucData as TzalamUserCompanyRow[] | null) ?? [],
       },
     };
